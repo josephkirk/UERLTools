@@ -24,126 +24,138 @@ This document outlines the tasks required to create an Unreal Engine plugin that
 
 ## Phase 2: C++ Abstraction Layer for RLtools in UE
 
--   [ ] **2.1. Define Core RL Structures and Types**
-    -   [P] 2.1.1. Create C++ wrappers or adaptors for `rl_tools` concepts using UE-friendly types where appropriate. (`FRLEnvironmentConfig`, `FRLTrainingConfig` USTRUCTs exist; `URLAgentManager`, `URLEnvironmentComponent` UCLASSES exist. P = Partially done)
-    -   [ ] 2.1.2. Define `RLTOOLS_NAMESPACE_WRAPPER` as suggested in `doc.md` if needed. (**Note:** Currently not used. Decide if this is still desired or can be removed.)
-    -   [ ] 2.1.3. Establish conventions for data exchange between UE and `rl_tools`. (**Critical - Not Done** - See `NEEDFIX.md`)
-        -   [ ] 2.1.3.1. Implement C++ function in `URLAgentManager` to convert `TArray<float>` (UE observation/action) to `rl_tools::Matrix<...>`. 
-        -   [ ] 2.1.3.2. Implement C++ function in `URLAgentManager` to convert `rl_tools::Matrix<...>` (rl_tools action/policy output) to `TArray<float>`.
--   [ ] **2.2. Implement Custom UE Environment for `rl_tools`**
-    -   [X] 2.2.1. Design a base `UActorComponent` (`URLEnvironmentComponent`) to act as the bridge.
-    -   [ ] 2.2.2. Implement the `rl_tools` custom environment C++ API via an adapter class. (**Critical - Not Done** - See `NEEDFIX.md`)
-        -   [ ] 2.2.2.1. Design an adapter struct/class (e.g., `FRLEnvironmentAdapter`) that takes a `URLEnvironmentComponent*`.
-        -   [ ] 2.2.2.2. This adapter must implement the `rl_tools` environment concept (e.g., by providing `rlt::ENVIRONMENT_SPEC`, `rlt::ENVIRONMENT` typedefs or template specializations).
-        -   [ ] 2.2.2.3. Implement `static void rlt::malloc(DEVICE, ENVIRONMENT&)` and `static void rlt::free(DEVICE, ENVIRONMENT&)` for the adapter (likely NOPs or manage adapter-specific state if any).
-        -   [ ] 2.2.2.4. Implement `static void rlt::init(DEVICE, ENVIRONMENT&, typename ENVIRONMENT::Parameters&)` for the adapter.
-        -   [ ] 2.2.2.5. Implement `static void rlt::initial_state(DEVICE, ENVIRONMENT&, typename ENVIRONMENT::State&, RNG&)`: Calls `URLEnvironmentComponent::Reset()` and populates the observation in `State`.
-        -   [ ] 2.2.2.6. Implement `static void rlt::step(DEVICE, ENVIRONMENT&, typename ENVIRONMENT::State&, ACTION_TYPE&, typename ENVIRONMENT::State&, RNG&)`: Calls `URLEnvironmentComponent::Step(Action)` and updates `State`.
-        -   [ ] 2.2.2.7. Implement `static void rlt::observe(DEVICE, ENVIRONMENT&, typename ENVIRONMENT::State&, OBSERVATION_TYPE&, RNG&)`: Gets current observation from `URLEnvironmentComponent`.
-        -   [ ] 2.2.2.8. Implement `static typename ENVIRONMENT::T rlt::reward(DEVICE, ENVIRONMENT&, typename ENVIRONMENT::State&, ACTION_TYPE&, typename ENVIRONMENT::State&, RNG&)`: Gets current reward from `URLEnvironmentComponent`.
-        -   [ ] 2.2.2.9. Implement `static bool rlt::terminated(DEVICE, ENVIRONMENT&, typename ENVIRONMENT::State&, RNG&)`: Gets termination status from `URLEnvironmentComponent`.
-        -   [ ] 2.2.2.10. Ensure `URLEnvironmentComponent` has corresponding Blueprint-implementable or C++ functions to provide the necessary data (e.g., `GetCurrentObservation()`, `GetCurrentReward()`, `IsTerminated()`).
-    -   [X] 2.2.3. Ensure these functions can be overridden or configured by users for specific game environments (via `URLEnvironmentComponent`'s Blueprint events and virtual functions).
--   [ ] **2.3. Implement Agent Manager/Wrapper**
-    -   [ ] 2.3.1. Refactor/Create `URLAgentManager` as an Unreal Engine Subsystem (e.g., inheriting from `UGameInstanceSubsystem` or `UWorldSubsystem`) to manage the RL agent's lifecycle, policy, and training/inference process. (**Decision:** Changed from UObject to Subsystem).
-    -   [ ] 2.3.2. This class will encapsulate `rl_tools` algorithm setup (e.g., TD3). (**Critical - Placeholder C++ Implementation** - See `NEEDFIX.md`)
-        -   [ ] 2.3.2.1. Define `DEVICE` and `Parameters` (e.g., `rlt::rl::algorithms::td3::ActorCritic<Parameters<...>>`).
-        -   [ ] 2.3.2.2. Implement memory allocation (`rlt::malloc(device, agent_struct)`) for all `rl_tools` components (Actor, Critic, Target Actor, Target Critic, Optimizers, Replay Buffer, OffPolicyRunner, main algorithm struct) in `URLAgentManager::InitializeAgent`.
-        -   [ ] 2.3.2.3. Implement initialization (`rlt::init(device, component, params)`) for all these components.
-        -   [ ] 2.3.2.4. Implement memory deallocation (`rlt::free(device, agent_struct)`) in `URLAgentManager::BeginDestroy` or a dedicated cleanup function.
-    -   [ ] 2.3.3. Implement functions for initializing the agent, policy, and optimizer. (Covered by 2.3.2, C++ implementations are placeholders).
+-   [ ] **2.1. Define Core RL Structures and Types (Incorporating `Thoughts.md` & `claude_thought.md`)**
+    -   [ ] **2.1.1. Implement `URLAgentManagerSubsystem` (Higher Priority)**
+        -   [ ] Inherit from `UGameInstanceSubsystem` (or `UWorldSubsystem` if per-level agent lifecycle is strictly needed, but `UGameInstanceSubsystem` is generally preferred for global managers).
+        -   [ ] This subsystem will be the central point for managing RL agent lifecycles, policies, training, and inference processes.
+        -   [ ] Implement `Initialize(FSubsystemCollectionBase& Collection)` and `Deinitialize()` methods for robust lifecycle management.
+            -   [ ] Manage `rl_tools` resource allocation (e.g., using `rlt::malloc`) in `Initialize()` or specific agent creation methods.
+            -   [ ] Ensure proper deallocation of `rl_tools` resources (e.g., using `rlt::free`) in `Deinitialize()` or agent destruction methods. (**Critical Priority for memory safety**)
+        -   [ ] Ensure subsystem is easily accessible from both C++ (e.g., `GetGameInstance()->GetSubsystem<URLAgentManagerSubsystem>()`) and Blueprints.
+    -   [ ] **2.1.2. Implement Environment Adapter (Critical Priority)**
+        -   [ ] Create a templated C++ adapter class/struct (e.g., `UEEnvironmentAdapter<SPEC>`) to bridge `URLEnvironmentComponent` (or other UE environment representations) with the C++ API expected by `rl_tools`.
+        -   [ ] The adapter should implement the necessary static or member functions like `rlt::init`, `rlt::initial_state`, `rlt::step`, `rlt::observe`, `rlt::reward`, and `rlt::terminated`.
+        -   [ ] Design the adapter to be flexible, allowing for different UE environment sources and efficient data exchange (e.g., minimizing data copies).
+        -   [ ] Encapsulate environment-specific logic within the adapter, separating it from the core RL agent logic in the subsystem.
+    -   [ ] **2.1.3. Develop Core C++ Data Conversion & Normalization Utilities (Critical Priority)**
+        -   [ ] Create a dedicated C++ utility module/namespace (e.g., `RLToolsConversionUtils`) or static methods within the subsystem for robust and efficient data conversions.
+        -   [ ] Implement functions to convert between UE types (`TArray<float>`, `FVector`, `FRotator`, custom `USTRUCT`s for observations/actions) and `rl_tools::Matrix` or other tensor types.
+        -   [ ] Implement configurable normalization/denormalization logic for observation and action data within these C++ conversion utilities (see 3.5.2.1 for config).
 
 ## Phase 3: Blueprint Exposure Layer
 
--   [ ] **3.1. Create Blueprint Function Libraries**
-    -   [ ] 3.1.1. Develop `UBlueprintFunctionLibrary` classes for static utility functions related to RL. (**Note:** `RLBlueprintFunctionLibrary.h` exists, check implementation status.)
-    -   [ ] 3.1.2. Functions for creating/configuring environments, agents, or parameters from Blueprints.
+-   [ ] **3.1. Expand Blueprint Function Library (Medium Priority)**
+    -   [ ] Develop/Expand `URLToolsBlueprintFunctionLibrary` for common RL-related utilities accessible from Blueprints.
+        -   [ ] Expose high-level data conversion utilities (wrapping functionalities from 2.1.3) for Blueprint use (e.g., `ConvertObservationToRLMatrix`, `ConvertRLActionToUEFormat`).
+        -   [ ] Expose normalization/denormalization utilities for Blueprint users if direct manipulation/configuration is needed (alternative to purely config-driven normalization).
+        -   [ ] Provide Blueprint-callable functions for debugging and visualizing RL data (e.g., printing `rl_tools::Matrix` content, checking dimensions).
+        -   [ ] Add utilities for creating/validating `FRLTrainingConfig` and `FRLEnvironmentConfig` USTRUCTs from Blueprints.
 -   [ ] **3.2. Design UObject Wrappers for RL Concepts**
-    -   [P] 3.2.1. Create `UObject` subclasses to represent key `rl_tools` entities in Blueprints (e.g., `URLPolicy`, `URLReplayBuffer`, `URLTrainingConfig`). (**Note:** `FRLEnvironmentConfig` and `FRLTrainingConfig` are USTRUCTs. Decide if UObject wrappers are still needed or if USTRUCTs are sufficient. P = Partially done with USTRUCTs.)
+    -   [P] 3.2.1. Create `UObject` subclasses to represent key `rl_tools` entities in Blueprints (e.g., `URLPolicy`, `URLReplayBuffer`, `URLTrainingConfig`). (**Note:** `FRLEnvironmentConfig` and `FRLTrainingConfig` are USTRUCTs. USTRUCTs are generally preferred for configuration data. UObject wrappers might be considered for complex, stateful RL objects if they need independent Blueprint lifecycle management or polymorphism, but start with USTRUCTs where possible.)
     -   [X] 3.2.2. Expose properties of these UObjects/USTRUCTs using `UPROPERTY()` for Blueprint access. (Done for existing USTRUCTs).
--   [ ] **3.3. Implement Blueprint-Callable Functions (`UFUNCTION(BlueprintCallable)`)**
-    -   [X] 3.3.1. In `URLEnvironmentComponent`:
+-   [ ] **3.3. Implement Blueprint-Callable Functions in `URLAgentManagerSubsystem`**
+    -   [X] 3.3.1. In `URLEnvironmentComponent` (Existing, ensure consistency):
         -   [X] Functions to get observation/action space dimensions.
         -   [X] Functions to manually trigger environment reset, step (for debugging/custom loops).
-    -   [ ] 3.3.2. In `URLAgentManager` (or similar): (**Note:** Declarations exist, but C++ implementations are mostly placeholders - See `NEEDFIX.md`)
-        -   [ ] **Initialization**:
-            -   [ ] `InitializeAgent(EnvironmentComponent, TrainingConfig)` (C++ Placeholder)
-            -   [ ] `LoadPolicy(FString FilePath)` (C++ Placeholder)
-        -   [ ] **Training**:
-            -   [ ] `StartTraining()` / `ResumeTraining()` (C++ Placeholder)
-            -   [ ] `PauseTraining()` (C++ Placeholder)
-            -   [ ] `StepTraining(int NumSteps)` (C++ Placeholder)
-            -   [ ] `SavePolicy(FString FilePath)` (C++ Placeholder)
-        -   [ ] **Inference**:
-            -   [ ] `GetAction(TArray<float> Observation)` returning `TArray<float> Action` (C++ Placeholder - returns random)
+    -   [ ] 3.3.2. In `URLAgentManagerSubsystem`: (**Note:** Aim for a high-level, task-oriented API. Declarations exist, but C++ implementations are mostly placeholders - See `NEEDFIX.md`)
+        -   [ ] **Initialization & Configuration**:
+            -   [ ] `ConfigureAgent(FName AgentName, URLEnvironmentComponent* EnvironmentComponent, FRLTrainingConfig TrainingConfig)` (C++ Placeholder)
+            -   [ ] `LoadPolicy(FName AgentName, FString FilePath)` (C++ Placeholder)
+        -   [ ] **Training (Asynchronous)**:
+            -   [ ] `StartTraining(FName AgentName)` / `ResumeTraining(FName AgentName)` (C++ Placeholder, see 3.4, 4.1)
+            -   [ ] `PauseTraining(FName AgentName)` (C++ Placeholder)
+            -   [ ] `StopTraining(FName AgentName)` (C++ Placeholder)
+            -   [ ] `SavePolicy(FName AgentName, FString FilePath)` (C++ Placeholder)
+        -   [ ] **Inference (Synchronous, performant)**:
+            -   [ ] `GetAction(FName AgentName, const TArray<float>& Observation)` returning `TArray<float> Action` (C++ Placeholder - currently returns random, needs actual policy evaluation)
         -   [ ] **Status & Logging**:
-            -   [ ] `GetTrainingStatus()` (e.g., current step, average reward) (C++ Placeholder)
-            -   [ ] `GetEpisodeStats()` (C++ Placeholder)
+            -   [ ] `GetAgentTrainingStatus(FName AgentName)` (e.g., current step, average reward) (C++ Placeholder)
+            -   [ ] `GetAgentEpisodeStats(FName AgentName)` (C++ Placeholder)
     -   [X] 3.3.3. Ensure data types are Blueprint-friendly (e.g., `TArray<float>`, `FString`, custom `USTRUCTS` for configs). (Declarations use BP-friendly types).
--   [ ] **3.4. Handle Asynchronous Operations**
-    -   [ ] 3.4.1. For long-running tasks like `StartTraining()`, implement them asynchronously (e.g., using `FAsyncTask`, `FTSTicker`, or custom threading) to avoid blocking the game thread. (**Not Done** - See `NEEDFIX.md`)
-    -   [ ] 3.4.2. Provide Blueprint events (`UPROPERTY(BlueprintAssignable)`) for completion or progress updates (e.g., `OnTrainingStepCompleted`, `OnTrainingFinished`). (**Not Done**)
--   [ ] **3.5. Data Type Conversions**
-    -   [ ] 3.5.1. Implement robust conversion utilities between UE types (e.g., `FVector`, `FRotator`, `TArray`) and `rl_tools` matrix/tensor types. (**Note:** This is the same as 2.1.3. **Critical - Not Done**)
-    -   [ ] 3.5.2. Handle normalization and denormalization of observation/action data if necessary, configurable from Blueprints. (**Not Done** - See `NEEDFIX.md`)
-        -   [ ] 3.5.2.1. Add `bNormalizeObservations`, `ObservationMean`, `ObservationStd`, `bNormalizeActions`, `ActionMean`, `ActionStd` (or similar) to `FRLTrainingConfig` or `FRLEnvironmentConfig`.
-        -   [ ] 3.5.2.2. Implement normalization logic in the data conversion step from UE to `rl_tools` (e.g., after 2.1.3.1).
-        -   [ ] 3.5.2.3. Implement denormalization logic in the data conversion step from `rl_tools` to UE (e.g., before 2.1.3.2).
+-   [ ] **3.4. Design for Asynchronous Operations & Blueprint Events (Critical for Training Implementation)**
+    -   [ ] 3.4.1. Design long-running tasks in `URLAgentManagerSubsystem` (e.g., `StartTraining`, `StepTraining` if exposed) to be executed asynchronously using Unreal's `FAsyncTask` or `FTSTicker` to avoid blocking the game thread. (**Not Done** - See `NEEDFIX.md`)
+    -   [ ] 3.4.2. Provide `BlueprintAssignable` delegates (`UPROPERTY(BlueprintAssignable)`) in `URLAgentManagerSubsystem` for asynchronous operation updates. Examples:
+        -   [ ] `OnAgentTrainingStepCompleted(FName AgentName, int32 Step, float Reward)`
+        -   [ ] `OnAgentTrainingFinished(FName AgentName, bool bSuccess)`
+        -   [ ] `OnAgentPolicySaved(FName AgentName, FString FilePath)`
+        -   [ ] `OnAgentPolicyLoaded(FName AgentName, FString FilePath)`
+-   [ ] **3.5. Data Type Conversions and Normalization (Blueprint Facing)**
+    -   [ ] 3.5.1. Robust conversion utilities between UE types and `rl_tools` types are primarily C++ concerns (covered by 2.1.3). Blueprint exposure is via `URLToolsBlueprintFunctionLibrary` (3.1) or implicitly handled by subsystem functions.
+    -   [ ] 3.5.2. Handle normalization and denormalization of observation/action data, configurable from Blueprints. (**Not Done** - See `NEEDFIX.md`)
+        -   [ ] 3.5.2.1. Add `bNormalizeObservations`, `ObservationMean`, `ObservationStd`, `bNormalizeActions`, `ActionMean`, `ActionStd` (or similar, possibly per-element arrays) to `FRLTrainingConfig` or `FRLEnvironmentConfig`.
+        -   [ ] 3.5.2.2. Implement normalization logic within the C++ data conversion utilities (2.1.3), using values from the config structure, when converting from UE types to `rl_tools` types.
+        -   [ ] 3.5.2.3. Implement denormalization logic similarly when converting from `rl_tools` types back to UE types.
 
 ## Phase 4: Training Workflow Implementation
 
--   [ ] **4.1. Training Loop Management**
-    -   [ ] 4.1.1. Implement the main training loop within `URLAgentManager` (or a dedicated training class) using `rl_tools`' "Loop Interface" (`rlt::LoopState`, `rlt::step`) or direct calls to `collect`, `train_actor_critic`, etc.
-    -   [ ] 4.1.2. Integrate with the `URLEnvironmentComponent` for environment interactions.
-    -   [ ] 4.1.3. Allow configuration of training parameters (batch size, learning rates, discount factor, algorithm-specific hyperparameters) from Blueprints via `URLTrainingConfig` UObject or UStructs.
--   [ ] **4.2. Replay Buffer Management (for Off-Policy)**
-    -   [ ] 4.2.1. Expose replay buffer capacity and configuration.
-    -   [ ] 4.2.2. Potentially visualize replay buffer status (size, etc.).
+-   [ ] **4.1. Implement Asynchronous Training Loop (Critical Priority)**
+    -   [ ] Implement the main training loop(s) within `URLAgentManagerSubsystem` using asynchronous mechanisms (`FAsyncTask` with a custom task class, or `FTSTicker` for periodic updates).
+    -   [ ] Ensure the loop correctly interfaces with the environment adapter (2.1.2) for environment interaction (reset, step, observe) and `rl_tools` training algorithms/components (actor_critic, replay buffer, optimizer updates).
+    -   [ ] Trigger Blueprint events (3.4.2) for progress, completion, and other significant training events.
+    -   [ ] Implement robust thread safety for any data shared between the game thread (e.g., for observation gathering if environment runs on game thread) and the training thread. Use UE's synchronization primitives (Mutexes, Critical Sections, Atomic variables).
+-   [ ] **4.2. Replay Buffer Management (for Off-Policy Algorithms)**
+    -   [ ] 4.2.1. Expose replay buffer capacity and other relevant configurations (e.g., batch size) in `FRLTrainingConfig`.
+    -   [ ] 4.2.2. Potentially visualize replay buffer status (current size, total samples collected) via `GetAgentTrainingStatus` or dedicated Blueprint functions/events.
 -   [ ] **4.3. Checkpointing and Model Saving/Loading**
-    -   [ ] 4.3.1. Implement functionality to save trained policies and optimizers (e.g., to HDF5 if `rl_tools` HDF5 support is compiled, or to its `.h` format).
-    -   [ ] 4.3.2. Implement loading of pre-trained policies for continued training or inference.
-    -   [ ] 4.3.3. Expose these via Blueprint functions in `URLAgentManager`.
+    -   [ ] 4.3.1. Implement functionality in `URLAgentManagerSubsystem` to save trained policies and optimizer states. `rl_tools` supports saving to HDF5 (if compiled with HDF5 support) or its own header-file format. Choose a suitable format.
+    -   [ ] 4.3.2. Implement loading of pre-trained policies (and optimizer states if continuing training) in `URLAgentManagerSubsystem`.
+    -   [ ] 4.3.3. Expose these via Blueprint functions (e.g., `SavePolicy`, `LoadPolicy` in 3.3.2) and corresponding `BlueprintAssignable` events (3.4.2).
 -   [ ] **4.4. Logging and Visualization Hooks**
-    -   [ ] 4.4.1. Log training progress (rewards, losses, episode lengths) to UE's output log and potentially to CSV files.
-    -   [ ] 4.4.2. Explore integration with `rl_tools`' TensorBoard logging if feasible and desired (might require compiling `rl_tools` with TensorBoard support).
-    -   [ ] 4.4.3. Provide Blueprint events or functions to retrieve key metrics for display in UMG.
+    -   [ ] 4.4.1. Log training progress (rewards, losses, episode lengths, custom metrics) to UE's Output Log (`UE_LOG`) and potentially to CSV files for external analysis.
+    -   [ ] 4.4.2. Explore integration with `rl_tools`' TensorBoard logging if feasible and desired. This might require compiling `rl_tools` with specific flags and handling file paths correctly.
+    -   [ ] 4.4.3. Provide Blueprint events or functions to retrieve key metrics (e.g., `GetAgentTrainingStatus` in 3.3.2) for display in UMG or other UE visualization tools.
 
 ## Phase 5: Inference Workflow Implementation
 
--   [ ] **5.1. Policy Loading for Inference**
-    -   [ ] 5.1.1. Ensure `URLAgentManager` can load a pre-trained policy specifically for inference mode (e.g., no optimizers, replay buffers needed).
+-   [ ] **5.1. Optimize Policy Deployment for Inference**
+    -   [ ] Ensure `rl_tools` policy evaluation (`rlt::evaluate`) is efficient for real-time inference within the game loop.
+    -   [ ] Provide options in `URLAgentManagerSubsystem` or via `FRLInferenceConfig` (if needed) for deterministic vs. stochastic policy evaluation modes during inference.
 -   [ ] **5.2. Real-time Action Generation**
-    -   [ ] 5.2.1. Implement `GetAction` in `URLAgentManager` to take an observation from UE (via `URLEnvironmentComponent::Observe`), pass it to the loaded `rl_tools` policy (`rlt::evaluate`), and return the action.
-    -   [ ] 5.2.2. Ensure this is performant for real-time game loops.
+    -   [ ] 5.2.1. Implement the C++ core of `GetAction(FName AgentName, ...)` in `URLAgentManagerSubsystem`. This function should:
+        -   Take an observation (already converted to `TArray<float>`).
+        -   Convert it to the `rl_tools::Matrix` format (using 2.1.3 utilities).
+        -   Pass it to the loaded `rl_tools` policy for evaluation (`rlt::evaluate`).
+        -   Convert the resulting `rl_tools::Matrix` action back to `TArray<float>` (using 2.1.3 utilities).
+        -   Return the action.
+    -   [ ] 5.2.2. Profile and ensure this entire `GetAction` pipeline is highly performant for use in real-time game loops (e.g., called every frame or AI tick).
 -   [ ] **5.3. Integration with UE AI Systems**
-    -   [ ] 5.3.1. Develop examples or guidance on how to use the Blueprint-exposed RL agent with UE Behavior Trees (e.g., custom BTTask "GetRLAction").
-    -   [ ] 5.3.2. Show how to integrate with UE AI Perception system for providing observations.
+    -   [ ] 5.3.1. Develop examples or clear guidance on how to use the Blueprint-exposed RL agent (`GetAction` from `URLAgentManagerSubsystem`) within UE Behavior Trees (e.g., by creating a custom `UBTTask_GetRLAction`).
+    -   [ ] 5.3.2. Provide examples or guidance on how `URLEnvironmentComponent` (or a similar observation provider) can integrate with UE's AI Perception system to gather observations for the RL agent.
 
-## Phase 6: Advanced Features & Polish
+## Phase 6: Advanced Features & Future-Proofing
 
--   [ ] **6.1. Multi-Agent Support (Future Consideration)**
-    -   [ ] 6.1.1. Investigate `rl_tools` capabilities for multi-agent RL (e.g., Multi-Agent PPO mentioned in `rl_tools` README).
-    -   [ ] 6.1.2. Plan for potential extensions to the plugin architecture to support multiple interacting agents.
--   [ ] **6.2. Support for Different `rl_tools` Devices (CPU/GPU)**
-    -   [ ] 6.2.1. Initially focus on CPU (`rlt::devices::DefaultCPU`).
-    -   [ ] 6.2.2. Investigate requirements for supporting `rl_tools` CUDA backend (`rlt::devices::CUDA`) if available and desired, including build system changes and UE integration complexities.
+-   [ ] **6.1. Multi-Agent Support (Architectural Consideration from Start)**
+    -   [ ] Design `URLAgentManagerSubsystem` and related data structures to inherently support managing multiple, independent, named agents.
+    -   [ ] Implement an internal registry within the subsystem (e.g., `TMap<FName, FRLAgentContext>`) to store state, policy, configs, etc., for each agent.
+    -   [ ] Most Blueprint functions in the subsystem (e.g., `ConfigureAgent`, `StartTraining`, `GetAction`) should take an `FName AgentName` parameter.
+-   [ ] **6.2. Device Support Extension (CPU/GPU Flexibility)**
+    -   [ ] Template key C++ functions (e.g., in conversion utilities (2.1.3), environment adapter (2.1.2), core `rl_tools` interactions within the subsystem) on `rl_tools` device types (e.g., `rlt::devices::DefaultCPU`, `rlt::devices::DefaultGPU`).
+    -   [ ] Design data structures and workflows to be adaptable for future GPU support with minimal code duplication. This involves using `rl_tools` device objects appropriately.
+    -   [ ] Add configuration options (e.g., in `FRLTrainingConfig`) to select the computation device (CPU/GPU) where applicable, once `rl_tools` GPU operations are integrated.
 -   [ ] **6.3. Parameter Tuning Utilities**
-    -   [ ] 6.3.1. Allow dynamic adjustment of some training parameters from Blueprints or via console commands for easier tuning.
+    -   [ ] Allow dynamic adjustment of some training parameters (e.g., learning rate, discount factor, exploration parameters) from Blueprints or via UE console commands for easier experimentation and tuning, if feasible with `rl_tools` architecture.
 -   [ ] **6.4. Error Handling and Reporting**
-    -   [ ] 6.4.1. Implement robust error checking and reporting to Blueprints and UE logs (e.g., for invalid configurations, file I/O errors, `rl_tools` exceptions).
+    -   [ ] Implement robust error checking and reporting throughout the plugin.
+    -   [ ] Use `UE_LOG` for detailed C++ errors and warnings.
+    -   [ ] Propagate user-friendly error messages or status codes to Blueprint operations (e.g., return values, output pins on BP nodes, specific error events).
+    -   [ ] Handle potential exceptions or error codes from `rl_tools` operations gracefully.
 
 ## Phase 7: Documentation and Examples
 
 -   [ ] **7.1. Plugin README**
-    -   [ ] 7.1.1. Write a comprehensive `README.md` for the `UERLTools` plugin.
-        -   [ ] Installation instructions.
-        -   [ ] Overview of features and Blueprint API.
-        -   [ ] Basic usage examples.
+    -   [ ] 7.1.1. Write/Update a comprehensive `README.md` for the `UERLTools` plugin.
+        -   [ ] Installation instructions (including `rl_tools` setup if manual steps involved).
+        -   [ ] Overview of features, architecture (subsystem, adapter), and Blueprint API.
+        -   [ ] Basic usage examples and workflow descriptions.
 -   [ ] **7.2. Example Project/Map**
-    -   [ ] 7.2.1. Create a simple example UE project or map demonstrating:
-        -   [ ] Setting up an `URLEnvironmentComponent` for a simple task (e.g., a pawn learning to reach a target).
-        -   [ ] Configuring and training an agent using Blueprints.
-        -   [ ] Using a trained agent for inference in a simple scenario.
+    -   [ ] 7.2.1. Create a simple, functional example UE project or map demonstrating:
+        -   [ ] Setting up an `URLEnvironmentComponent` for a basic task (e.g., a pawn learning to navigate to a target).
+        -   [ ] Configuring and training an agent using the `URLAgentManagerSubsystem` via Blueprints.
+        -   [ ] Using a trained agent for inference in a simple game scenario.
 -   [ ] **7.3. Code Comments and API Documentation**
-    -   [ ] 7.3.1. Ensure all C++ and Blueprint-exposed code is well-commented.
-    -   [ ] 7.3.2. Generate API documentation if feasible.
+    -   [ ] 7.3.1. Ensure all C++ classes, functions, and Blueprint-exposed elements are well-commented (using Unreal's documentation comment standards).
+    -   [ ] 7.3.2. Consider generating API documentation (e.g., using Doxygen or Unreal's built-in tools if applicable) for C++ developers.
+
+---
+
+These updates align with the strategic recommendations in `Thoughts.md` and `claude_thought.md`, focusing on robust architecture, efficient data handling, and extensibility for future growth. By following this refined roadmap, the RLtools-UE integration will be more maintainable and scalable, meeting both current and future needs.
