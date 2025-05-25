@@ -4,83 +4,91 @@ This document outlines the tasks required to create an Unreal Engine plugin that
 
 ## Phase 1: RLtools Integration and Basic Setup
 
--   [x] **1.1. Create Unreal Engine Plugin (`UERLTools`)**
-    -   [x] 1.1.1. Use the UE Editor to create a new C++ "Third Party Plugin" or a blank C++ plugin.
-    -   [x] 1.1.2. Define plugin structure (Source, Resources, etc.).
--   [ ] **1.2. Integrate `rl_tools` Library**
-    -   [x] 1.2.1. Clone/copy `rl_tools` repository into `UERLTools/Source/ThirdParty/rl_tools_lib/`.
-    -   [ ] 1.2.2. Ensure only necessary components (primarily the `include` directory from `rl_tools/src` for the header-only core) are included to keep the plugin lean.
-    -   [ ] 1.2.3. Configure `UERLTools.Build.cs`:
-        -   [ ] Add `rl_tools_lib/include` to `PublicIncludePaths` or `PrivateIncludePaths`.
-        -   [ ] Set `CppStandard = CppStandardVersion.Cpp17`.
-        -   [ ] Add any necessary `PublicDefinitions` if required by `rl_tools`.
-        -   [ ] Handle potential compiler warnings (e.g., consider `bEnableUndefinedIdentifierWarnings = false;` cautiously, or use `THIRD_PARTY_INCLUDES_START/END`).
--   [ ] **1.3. Initial Compilation and Verification**
-    -   [ ] 1.3.1. Create a test C++ class within the plugin.
-    -   [ ] 1.3.2. Include core `rl_tools` headers (e.g., `<rl_tools/operations/cpu_mux.h>`, `<rl_tools/devices/cpu.h>`).
-    -   [ ] 1.3.3. Instantiate basic `rl_tools` types (e.g., `rlt::devices::DefaultCPU`).
-    -   [ ] 1.3.4. Compile the UE project to ensure `rl_tools` is recognized and builds correctly.
-    -   [ ] 1.3.5. Address any compilation errors or warnings, potentially by wrapping includes with `THIRD_PARTY_INCLUDES_START`/`THIRD_PARTY_INCLUDES_END` and specific warning pragmas.
+-   [X] **1.1. Create Unreal Engine Plugin (`UERLTools`)**
+    -   [X] 1.1.1. Use the UE Editor to create a new C++ "Third Party Plugin" or a blank C++ plugin.
+    -   [X] 1.1.2. Define plugin structure (Source, Resources, etc.).
+-   [X] **1.2. Integrate `rl_tools` Library**
+    -   [X] 1.2.1. Clone/copy `rl_tools` repository into `UERLTools/Source/ThirdParty/rl_tools/`. (Path corrected)
+    -   [X] 1.2.2. Ensure only necessary components (primarily the `include` directory from `rl_tools/src` for the header-only core) are included to keep the plugin lean.
+    -   [X] 1.2.3. Configure `UERLTools.Build.cs`:
+        -   [X] Add `rl_tools/include` to `PublicIncludePaths`. (Path corrected from `rl_tools_lib/include`)
+        -   [X] Set `CppStandard = CppStandardVersion.Cpp17`.
+        -   [X] Add any necessary `PublicDefinitions` if required by `rl_tools`. (Assumed done/not needed if not specified as missing)
+        -   [X] Handle potential compiler warnings (e.g., consider `bEnableUndefinedIdentifierWarnings = false;` cautiously, or use `THIRD_PARTY_INCLUDES_START/END`). (Confirmed done)
+-   [X] **1.3. Initial Compilation and Verification**
+    -   [X] 1.3.1. Create a test C++ class within the plugin (`RLToolsTest`).
+    -   [X] 1.3.2. Include core `rl_tools` headers (e.g., `<rl_tools/operations/cpu_mux.h>`, `<rl_tools/devices/cpu.h>`).
+    -   [X] 1.3.3. Instantiate basic `rl_tools` types (e.g., `rlt::devices::DefaultCPU`).
+    -   [X] 1.3.4. Compile the UE project to ensure `rl_tools` is recognized and builds correctly.
+    -   [X] 1.3.5. Address any compilation errors or warnings, potentially by wrapping includes with `THIRD_PARTY_INCLUDES_START`/`THIRD_PARTY_INCLUDES_END` and specific warning pragmas. (Covered by 1.2.3)
 
 ## Phase 2: C++ Abstraction Layer for RLtools in UE
 
 -   [ ] **2.1. Define Core RL Structures and Types**
-    -   [ ] 2.1.1. Create C++ wrappers or adaptors for `rl_tools` concepts using UE-friendly types where appropriate.
-    -   [ ] 2.1.2. Define `RLTOOLS_NAMESPACE_WRAPPER` as suggested in `doc.md` if needed.
-    -   [ ] 2.1.3. Establish conventions for data exchange between UE and `rl_tools` (e.g., using `TArray` for observations/actions and converting to/from `rl_tools` matrix types).
+    -   [P] 2.1.1. Create C++ wrappers or adaptors for `rl_tools` concepts using UE-friendly types where appropriate. (`FRLEnvironmentConfig`, `FRLTrainingConfig` USTRUCTs exist; `URLAgentManager`, `URLEnvironmentComponent` UCLASSES exist. P = Partially done)
+    -   [ ] 2.1.2. Define `RLTOOLS_NAMESPACE_WRAPPER` as suggested in `doc.md` if needed. (**Note:** Currently not used. Decide if this is still desired or can be removed.)
+    -   [ ] 2.1.3. Establish conventions for data exchange between UE and `rl_tools`. (**Critical - Not Done** - See `NEEDFIX.md`)
+        -   [ ] 2.1.3.1. Implement C++ function in `URLAgentManager` to convert `TArray<float>` (UE observation/action) to `rl_tools::Matrix<...>`. 
+        -   [ ] 2.1.3.2. Implement C++ function in `URLAgentManager` to convert `rl_tools::Matrix<...>` (rl_tools action/policy output) to `TArray<float>`.
 -   [ ] **2.2. Implement Custom UE Environment for `rl_tools`**
-    -   [ ] 2.2.1. Design a base `UActorComponent` (e.g., `URLEnvironmentComponent`) to act as the bridge.
-    -   [ ] 2.2.2. Implement the `rl_tools` custom environment API within this component:
-        -   [ ] Define `ENVIRONMENT_SPEC` (Observation/Action dimensions, types T, TI).
-        -   [ ] Define `ENVIRONMENT` struct to hold UE-specific state.
-        -   [ ] Implement `rlt::malloc`, `rlt::free` (likely NOPs).
-        -   [ ] Implement `rlt::init`.
-        -   [ ] Implement `rlt::initial_state` (reset UE state, provide initial observation).
-        -   [ ] Implement `rlt::step` (apply action in UE, simulate, get next state).
-        -   [ ] Implement `rlt::observe` (collect observation from UE state).
-        -   [ ] Implement `rlt::reward` (calculate reward based on UE state transition).
-        -   [ ] Implement `rlt::terminated` (check termination conditions in UE).
-    -   [ ] 2.2.3. Ensure these functions can be overridden or configured by users for specific game environments.
+    -   [X] 2.2.1. Design a base `UActorComponent` (`URLEnvironmentComponent`) to act as the bridge.
+    -   [ ] 2.2.2. Implement the `rl_tools` custom environment C++ API via an adapter class. (**Critical - Not Done** - See `NEEDFIX.md`)
+        -   [ ] 2.2.2.1. Design an adapter struct/class (e.g., `FRLEnvironmentAdapter`) that takes a `URLEnvironmentComponent*`.
+        -   [ ] 2.2.2.2. This adapter must implement the `rl_tools` environment concept (e.g., by providing `rlt::ENVIRONMENT_SPEC`, `rlt::ENVIRONMENT` typedefs or template specializations).
+        -   [ ] 2.2.2.3. Implement `static void rlt::malloc(DEVICE, ENVIRONMENT&)` and `static void rlt::free(DEVICE, ENVIRONMENT&)` for the adapter (likely NOPs or manage adapter-specific state if any).
+        -   [ ] 2.2.2.4. Implement `static void rlt::init(DEVICE, ENVIRONMENT&, typename ENVIRONMENT::Parameters&)` for the adapter.
+        -   [ ] 2.2.2.5. Implement `static void rlt::initial_state(DEVICE, ENVIRONMENT&, typename ENVIRONMENT::State&, RNG&)`: Calls `URLEnvironmentComponent::Reset()` and populates the observation in `State`.
+        -   [ ] 2.2.2.6. Implement `static void rlt::step(DEVICE, ENVIRONMENT&, typename ENVIRONMENT::State&, ACTION_TYPE&, typename ENVIRONMENT::State&, RNG&)`: Calls `URLEnvironmentComponent::Step(Action)` and updates `State`.
+        -   [ ] 2.2.2.7. Implement `static void rlt::observe(DEVICE, ENVIRONMENT&, typename ENVIRONMENT::State&, OBSERVATION_TYPE&, RNG&)`: Gets current observation from `URLEnvironmentComponent`.
+        -   [ ] 2.2.2.8. Implement `static typename ENVIRONMENT::T rlt::reward(DEVICE, ENVIRONMENT&, typename ENVIRONMENT::State&, ACTION_TYPE&, typename ENVIRONMENT::State&, RNG&)`: Gets current reward from `URLEnvironmentComponent`.
+        -   [ ] 2.2.2.9. Implement `static bool rlt::terminated(DEVICE, ENVIRONMENT&, typename ENVIRONMENT::State&, RNG&)`: Gets termination status from `URLEnvironmentComponent`.
+        -   [ ] 2.2.2.10. Ensure `URLEnvironmentComponent` has corresponding Blueprint-implementable or C++ functions to provide the necessary data (e.g., `GetCurrentObservation()`, `GetCurrentReward()`, `IsTerminated()`).
+    -   [X] 2.2.3. Ensure these functions can be overridden or configured by users for specific game environments (via `URLEnvironmentComponent`'s Blueprint events and virtual functions).
 -   [ ] **2.3. Implement Agent Manager/Wrapper**
-    -   [ ] 2.3.1. Create a C++ class (e.g., `URLAgentManager` as a `UObject` or `AActor`) to manage the RL agent's lifecycle, policy, and training/inference process.
-    -   [ ] 2.3.2. This class will encapsulate `rl_tools` algorithm setup (e.g., TD3, PPO, SAC).
-        -   [ ] Actor-Critic network creation (`rlt::nn_models::mlp::NeuralNetwork`).
-        -   [ ] Algorithm-specific parameters and components (e.g., `rlt::rl::algorithms::td3::ActorCritic`, `rlt::rl::components::OffPolicyRunner`, `rlt::rl::components::replay_buffer::ReplayBuffer`).
-    -   [ ] 2.3.3. Implement functions for initializing the agent, policy, and optimizer.
+    -   [ ] 2.3.1. Refactor/Create `URLAgentManager` as an Unreal Engine Subsystem (e.g., inheriting from `UGameInstanceSubsystem` or `UWorldSubsystem`) to manage the RL agent's lifecycle, policy, and training/inference process. (**Decision:** Changed from UObject to Subsystem).
+    -   [ ] 2.3.2. This class will encapsulate `rl_tools` algorithm setup (e.g., TD3). (**Critical - Placeholder C++ Implementation** - See `NEEDFIX.md`)
+        -   [ ] 2.3.2.1. Define `DEVICE` and `Parameters` (e.g., `rlt::rl::algorithms::td3::ActorCritic<Parameters<...>>`).
+        -   [ ] 2.3.2.2. Implement memory allocation (`rlt::malloc(device, agent_struct)`) for all `rl_tools` components (Actor, Critic, Target Actor, Target Critic, Optimizers, Replay Buffer, OffPolicyRunner, main algorithm struct) in `URLAgentManager::InitializeAgent`.
+        -   [ ] 2.3.2.3. Implement initialization (`rlt::init(device, component, params)`) for all these components.
+        -   [ ] 2.3.2.4. Implement memory deallocation (`rlt::free(device, agent_struct)`) in `URLAgentManager::BeginDestroy` or a dedicated cleanup function.
+    -   [ ] 2.3.3. Implement functions for initializing the agent, policy, and optimizer. (Covered by 2.3.2, C++ implementations are placeholders).
 
 ## Phase 3: Blueprint Exposure Layer
 
 -   [ ] **3.1. Create Blueprint Function Libraries**
-    -   [ ] 3.1.1. Develop `UBlueprintFunctionLibrary` classes for static utility functions related to RL.
+    -   [ ] 3.1.1. Develop `UBlueprintFunctionLibrary` classes for static utility functions related to RL. (**Note:** `RLBlueprintFunctionLibrary.h` exists, check implementation status.)
     -   [ ] 3.1.2. Functions for creating/configuring environments, agents, or parameters from Blueprints.
 -   [ ] **3.2. Design UObject Wrappers for RL Concepts**
-    -   [ ] 3.2.1. Create `UObject` subclasses to represent key `rl_tools` entities in Blueprints (e.g., `URLPolicy`, `URLReplayBuffer`, `URLTrainingConfig`).
-    -   [ ] 3.2.2. Expose properties of these UObjects using `UPROPERTY()` for Blueprint access.
+    -   [P] 3.2.1. Create `UObject` subclasses to represent key `rl_tools` entities in Blueprints (e.g., `URLPolicy`, `URLReplayBuffer`, `URLTrainingConfig`). (**Note:** `FRLEnvironmentConfig` and `FRLTrainingConfig` are USTRUCTs. Decide if UObject wrappers are still needed or if USTRUCTs are sufficient. P = Partially done with USTRUCTs.)
+    -   [X] 3.2.2. Expose properties of these UObjects/USTRUCTs using `UPROPERTY()` for Blueprint access. (Done for existing USTRUCTs).
 -   [ ] **3.3. Implement Blueprint-Callable Functions (`UFUNCTION(BlueprintCallable)`)**
-    -   [ ] 3.3.1. In `URLEnvironmentComponent`:
-        -   [ ] Functions to get observation/action space dimensions.
-        -   [ ] Functions to manually trigger environment reset, step (for debugging/custom loops).
-    -   [ ] 3.3.2. In `URLAgentManager` (or similar):
+    -   [X] 3.3.1. In `URLEnvironmentComponent`:
+        -   [X] Functions to get observation/action space dimensions.
+        -   [X] Functions to manually trigger environment reset, step (for debugging/custom loops).
+    -   [ ] 3.3.2. In `URLAgentManager` (or similar): (**Note:** Declarations exist, but C++ implementations are mostly placeholders - See `NEEDFIX.md`)
         -   [ ] **Initialization**:
-            -   `InitializeAgent(EnvironmentComponent, TrainingConfig)`
-            -   `LoadPolicy(FString FilePath)`
+            -   [ ] `InitializeAgent(EnvironmentComponent, TrainingConfig)` (C++ Placeholder)
+            -   [ ] `LoadPolicy(FString FilePath)` (C++ Placeholder)
         -   [ ] **Training**:
-            -   `StartTraining()` / `ResumeTraining()`
-            -   `PauseTraining()`
-            -   `StepTraining(int NumSteps)` (for manual stepping from BP)
-            -   `SavePolicy(FString FilePath)`
+            -   [ ] `StartTraining()` / `ResumeTraining()` (C++ Placeholder)
+            -   [ ] `PauseTraining()` (C++ Placeholder)
+            -   [ ] `StepTraining(int NumSteps)` (C++ Placeholder)
+            -   [ ] `SavePolicy(FString FilePath)` (C++ Placeholder)
         -   [ ] **Inference**:
-            -   `GetAction(TArray<float> Observation)` returning `TArray<float> Action`
+            -   [ ] `GetAction(TArray<float> Observation)` returning `TArray<float> Action` (C++ Placeholder - returns random)
         -   [ ] **Status & Logging**:
-            -   `GetTrainingStatus()` (e.g., current step, average reward)
-            -   `GetEpisodeStats()`
-    -   [ ] 3.3.3. Ensure data types are Blueprint-friendly (e.g., `TArray<float>`, `FString`, custom `USTRUCTS` for configs).
+            -   [ ] `GetTrainingStatus()` (e.g., current step, average reward) (C++ Placeholder)
+            -   [ ] `GetEpisodeStats()` (C++ Placeholder)
+    -   [X] 3.3.3. Ensure data types are Blueprint-friendly (e.g., `TArray<float>`, `FString`, custom `USTRUCTS` for configs). (Declarations use BP-friendly types).
 -   [ ] **3.4. Handle Asynchronous Operations**
-    -   [ ] 3.4.1. For long-running tasks like `StartTraining()`, implement them asynchronously (e.g., using `FAsyncTask`, `FTSTicker`, or custom threading) to avoid blocking the game thread.
-    -   [ ] 3.4.2. Provide Blueprint events (`UPROPERTY(BlueprintAssignable)`) for completion or progress updates (e.g., `OnTrainingStepCompleted`, `OnTrainingFinished`).
+    -   [ ] 3.4.1. For long-running tasks like `StartTraining()`, implement them asynchronously (e.g., using `FAsyncTask`, `FTSTicker`, or custom threading) to avoid blocking the game thread. (**Not Done** - See `NEEDFIX.md`)
+    -   [ ] 3.4.2. Provide Blueprint events (`UPROPERTY(BlueprintAssignable)`) for completion or progress updates (e.g., `OnTrainingStepCompleted`, `OnTrainingFinished`). (**Not Done**)
 -   [ ] **3.5. Data Type Conversions**
-    -   [ ] 3.5.1. Implement robust conversion utilities between UE types (e.g., `FVector`, `FRotator`, `TArray`) and `rl_tools` matrix/tensor types.
-    -   [ ] 3.5.2. Handle normalization and denormalization of observation/action data if necessary, configurable from Blueprints.
+    -   [ ] 3.5.1. Implement robust conversion utilities between UE types (e.g., `FVector`, `FRotator`, `TArray`) and `rl_tools` matrix/tensor types. (**Note:** This is the same as 2.1.3. **Critical - Not Done**)
+    -   [ ] 3.5.2. Handle normalization and denormalization of observation/action data if necessary, configurable from Blueprints. (**Not Done** - See `NEEDFIX.md`)
+        -   [ ] 3.5.2.1. Add `bNormalizeObservations`, `ObservationMean`, `ObservationStd`, `bNormalizeActions`, `ActionMean`, `ActionStd` (or similar) to `FRLTrainingConfig` or `FRLEnvironmentConfig`.
+        -   [ ] 3.5.2.2. Implement normalization logic in the data conversion step from UE to `rl_tools` (e.g., after 2.1.3.1).
+        -   [ ] 3.5.2.3. Implement denormalization logic in the data conversion step from `rl_tools` to UE (e.g., before 2.1.3.2).
 
 ## Phase 4: Training Workflow Implementation
 
