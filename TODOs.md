@@ -23,14 +23,16 @@ This document outlines the tasks required to create an Unreal Engine plugin that
 
 ## Phase 2: C++ Abstraction Layer for RLtools in UE
 
--   [ ] **2.1. Define Core RL Structures and Types **
-    -   [ ] **2.1.1. Implement `URLAgentManagerSubsystem` (Higher Priority)**
-        -   [ ] Inherit from `UGameInstanceSubsystem` (or `UWorldSubsystem` if per-level agent lifecycle is strictly needed, but `UGameInstanceSubsystem` is generally preferred for global managers).
-        -   [ ] This subsystem will be the central point for managing RL agent lifecycles, policies, training, and inference processes.
-        -   [ ] Implement `Initialize(FSubsystemCollectionBase& Collection)` and `Deinitialize()` methods for robust lifecycle management.
-            -   [ ] Manage `rl_tools` resource allocation (e.g., using `rlt::malloc`) in `Initialize()` or specific agent creation methods.
-            -   [ ] Ensure proper deallocation of `rl_tools` resources (e.g., using `rlt::free`) in `Deinitialize()` or agent destruction methods. (**Critical Priority for memory safety**)
-        -   [ ] Ensure subsystem is easily accessible from both C++ (e.g., `GetGameInstance()->GetSubsystem<URLAgentManagerSubsystem>()`) and Blueprints.
+-   [X] **2.1. Define Core RL Structures and Types **
+    -   [X] **2.1.1. Implement `URLAgentManagerSubsystem` (Higher Priority)**
+        -   [X] Inherit from `UGameInstanceSubsystem` (or `UWorldSubsystem` if per-level agent lifecycle is strictly needed, but `UGameInstanceSubsystem` is generally preferred for global managers).
+        -   [X] This subsystem will be the central point for managing RL agent lifecycles, policies, training, and inference processes.
+        -   [X] Implement `Initialize(FSubsystemCollectionBase& Collection)` and `Deinitialize()` methods for robust lifecycle management. (Stubs created, basic structure in place)
+            -   [X] Manage `rl_tools` resource allocation (e.g., using `rlt::malloc`) in `Initialize()` or specific agent creation methods.
+                -   Full implementation: Agent context, training config storage, and allocation logic for rl_tools components (policy, optimizer, actor-critic, replay buffer) are now implemented (see URLAgentManagerSubsystem.cpp, 2025-05-26).
+            -   [X] Ensure proper deallocation of `rl_tools` resources (e.g., using `rlt::free`) in `Deinitialize()` or agent destruction methods. (**Critical Priority for memory safety**)
+                -   Cleanup logic for allocated rl_tools resources is now implemented (2025-05-26).
+        -   [X] Ensure subsystem is easily accessible from both C++ (e.g., `GetGameInstance()->GetSubsystem<URLAgentManagerSubsystem>()`) and Blueprints. (Achieved by `UGameInstanceSubsystem` nature)
     -   [X] **2.1.2. Implement Environment Adapter (Critical Priority)**
         -   [X] Create a templated C++ adapter class/struct (e.g., `UEEnvironmentAdapter<SPEC>`) to bridge `URLEnvironmentComponent` (or other UE environment representations) with the C++ API expected by `rl_tools`.
         -   [X] The adapter should implement the necessary static or member functions like `rlt::init`, `rlt::initial_state`, `rlt::step`, `rlt::observe`, `rlt::reward`, and `rlt::terminated`.
@@ -40,6 +42,13 @@ This document outlines the tasks required to create an Unreal Engine plugin that
         -   [X] Create a dedicated C++ utility module/namespace (e.g., `RLToolsConversionUtils`) or static methods within the subsystem for robust and efficient data conversions.
         -   [X] Implement functions to convert between UE types (`TArray<float>`, `FVector`, `FRotator`, custom `USTRUCT`s for observations/actions) and `rl_tools::Matrix` or other tensor types.
         -   [X] Implement configurable normalization/denormalization logic for observation and action data within these C++ conversion utilities (see 3.5.2.1 for config).
+
+-   [X] **2.2. Refine Core UE Components for RL Integration**
+    -   [X] **2.2.1. Refactor `URLEnvironmentComponent` for Adapter Compatibility (Supporting 2.1.2)**
+        -   [X] Align C++ API with `UEEnvironmentAdapter` requirements (renamed methods, added `IsDone`, `GetMaxEpisodeSteps`).
+        -   [X] Ensure BlueprintImplementableEvents are correctly invoked by C++ wrappers.
+        -   [X] Implement dimension validation for observations and actions.
+    - [X] 2.2.2 Create URLAgentComponent
 
 ## Phase 3: Blueprint Exposure Layer
 
@@ -73,11 +82,11 @@ This document outlines the tasks required to create an Unreal Engine plugin that
     -   [X] 3.3.3. Ensure data types are Blueprint-friendly (e.g., `TArray<float>`, `FString`, custom `USTRUCTS` for configs). (Declarations use BP-friendly types).
 -   [ ] **3.4. Design for Asynchronous Operations & Blueprint Events (Critical for Training Implementation)**
     -   [ ] 3.4.1. Design long-running tasks in `URLAgentManagerSubsystem` (e.g., `StartTraining`, `StepTraining` if exposed) to be executed asynchronously using Unreal's `FAsyncTask` or `FTSTicker` to avoid blocking the game thread. (**Not Done** - See `NEEDFIX.md`)
-    -   [ ] 3.4.2. Provide `BlueprintAssignable` delegates (`UPROPERTY(BlueprintAssignable)`) in `URLAgentManagerSubsystem` for asynchronous operation updates. Examples:
-        -   [ ] `OnAgentTrainingStepCompleted(FName AgentName, int32 Step, float Reward)`
-        -   [ ] `OnAgentTrainingFinished(FName AgentName, bool bSuccess)`
-        -   [ ] `OnAgentPolicySaved(FName AgentName, FString FilePath)`
-        -   [ ] `OnAgentPolicyLoaded(FName AgentName, FString FilePath)`
+    -   [P] 3.4.2. Provide `BlueprintAssignable` delegates (`UPROPERTY(BlueprintAssignable)`) in `URLAgentManagerSubsystem` for asynchronous operation updates. (Declarations in place) Examples:
+            -   [X] `OnAgentTrainingStepCompleted(FName AgentName, int32 Step, float Reward)` (Declaration done)
+            -   [X] `OnAgentTrainingFinished(FName AgentName, bool bSuccess)` (Declaration done)
+            -   [X] `OnAgentPolicySaved(FName AgentName, FString FilePath)` (Declaration done)
+            -   [X] `OnAgentPolicyLoaded(FName AgentName, FString FilePath)` (Declaration done)
 -   [ ] **3.5. Data Type Conversions and Normalization (Blueprint Facing)**
     -   [ ] 3.5.1. Robust conversion utilities between UE types and `rl_tools` types are primarily C++ concerns (covered by 2.1.3). Blueprint exposure is via `URLToolsBlueprintFunctionLibrary` (3.1) or implicitly handled by subsystem functions.
     -   [ ] 3.5.2. Handle normalization and denormalization of observation/action data, configurable from Blueprints. (**Not Done** - See `NEEDFIX.md`)

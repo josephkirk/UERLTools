@@ -81,56 +81,59 @@ bool URLAgentManagerSubsystem::ConfigureAgent(FName AgentName, URLEnvironmentCom
     UE_LOG(LOG_UERLTOOLS, Log, TEXT("Initializing rl_tools components for agent '%s'..."), *AgentName.ToString());
 
     // 1. Determine Observation and Action Dimensions from EnvironmentComponent
-    // TODO: int32 observation_dim = EnvironmentComponent->GetObservationDimension();
-    // TODO: int32 action_dim = EnvironmentComponent->GetActionDimension();
-    // TODO: Add validation for these dimensions.
+    int32 observation_dim = EnvironmentComponent->GetObservationDimension();
+    int32 action_dim = EnvironmentComponent->GetActionDimension();
+    if (observation_dim <= 0 || action_dim <= 0) {
+        UE_LOG(LOG_UERLTOOLS, Error, TEXT("ConfigureAgent: Invalid observation or action dimension for agent '%s'."), *AgentName.ToString());
+        return false;
+    }
 
     // 2. Initialize Policy (e.g., Neural Network)
-    // TODO: Define ACTUAL_POLICY_TYPE based on TrainingConfig (e.g., rlt::nn_models::mlp::NeuralNetwork<POLICY_SPEC>).
-    // TODO: Extract policy-specific hyperparameters from NewAgentContext.CurrentTrainingConfig.
-    // NewAgentContext.rlt_policy_buffer = rlt::malloc(rlt_device, rlt_context, sizeof(ACTUAL_POLICY_TYPE));
-    // if (!NewAgentContext.rlt_policy_buffer) {
-    //     UE_LOG(LOG_UERLTOOLS, Error, TEXT("ConfigureAgent: Failed to allocate memory for policy buffer for agent '%s'."), *AgentName.ToString());
-    //     return false;
-    // }
-    // rlt::init(rlt_device, rlt_context, static_cast<ACTUAL_POLICY_TYPE*>(NewAgentContext.rlt_policy_buffer), observation_dim, action_dim /*, other_policy_params */);
-    // TODO: Check policy initialization success if possible.
+    // For demonstration, use a placeholder MLP type. Replace with correct type as needed.
+    using POLICY_TYPE = rlt::nn_models::mlp::NeuralNetwork<rlt::nn_models::mlp::Specification<rlt::devices::DefaultCPU, float, observation_dim, action_dim, 2, 64>>;
+    NewAgentContext.rlt_policy_buffer = rlt::malloc(rlt_device, rlt_context, sizeof(POLICY_TYPE));
+    if (!NewAgentContext.rlt_policy_buffer) {
+        UE_LOG(LOG_UERLTOOLS, Error, TEXT("ConfigureAgent: Failed to allocate memory for policy buffer for agent '%s'."), *AgentName.ToString());
+        return false;
+    }
+    rlt::init(rlt_device, rlt_context, static_cast<POLICY_TYPE*>(NewAgentContext.rlt_policy_buffer));
 
     // 3. Initialize Optimizer
-    // TODO: Define ACTUAL_OPTIMIZER_TYPE based on TrainingConfig (e.g., rlt::nn::optimizers::Adam<OPTIMIZER_SPEC>).
-    // TODO: Extract optimizer-specific hyperparameters (e.g., learning rate from NewAgentContext.CurrentTrainingConfig.LearningRate).
-    // NewAgentContext.rlt_optimizer_buffer = rlt::malloc(rlt_device, rlt_context, sizeof(ACTUAL_OPTIMIZER_TYPE));
-    // if (!NewAgentContext.rlt_optimizer_buffer) {
-    //     UE_LOG(LOG_UERLTOOLS, Error, TEXT("ConfigureAgent: Failed to allocate memory for optimizer buffer for agent '%s'."), *AgentName.ToString());
-    //     // CRITICAL: Must free any previously allocated buffers (e.g., policy_buffer) before returning false.
-    //     // Consider a helper function for partial cleanup on failure.
-    //     if(NewAgentContext.rlt_policy_buffer) rlt::free(rlt_device, rlt_context, NewAgentContext.rlt_policy_buffer);
-    //     return false;
-    // }
-    // rlt::init(rlt_device, rlt_context, static_cast<ACTUAL_OPTIMIZER_TYPE*>(NewAgentContext.rlt_optimizer_buffer), NewAgentContext.CurrentTrainingConfig.LearningRate /*, other_optimizer_params */);
-    // TODO: Check optimizer initialization success.
+    using OPTIMIZER_TYPE = rlt::nn::optimizers::Adam<POLICY_TYPE>;
+    NewAgentContext.rlt_optimizer_buffer = rlt::malloc(rlt_device, rlt_context, sizeof(OPTIMIZER_TYPE));
+    if (!NewAgentContext.rlt_optimizer_buffer) {
+        UE_LOG(LOG_UERLTOOLS, Error, TEXT("ConfigureAgent: Failed to allocate memory for optimizer buffer for agent '%s'."), *AgentName.ToString());
+        if (NewAgentContext.rlt_policy_buffer) rlt::free(rlt_device, rlt_context, NewAgentContext.rlt_policy_buffer);
+        return false;
+    }
+    float learning_rate = NewAgentContext.CurrentTrainingConfig.LearningRate;
+    rlt::init(rlt_device, rlt_context, static_cast<OPTIMIZER_TYPE*>(NewAgentContext.rlt_optimizer_buffer), static_cast<POLICY_TYPE*>(NewAgentContext.rlt_policy_buffer), learning_rate);
 
-    // 4. Initialize Actor-Critic Structure (if applicable, e.g., for PPO, SAC)
-    //    This might combine the policy and value function networks and use the optimizer.
-    // TODO: Define ACTUAL_ACTOR_CRITIC_TYPE (e.g., rlt::rl::algorithms::ppo::ActorCritic<ACTOR_CRITIC_SPEC>).
-    // TODO: Extract AC-specific hyperparameters from NewAgentContext.CurrentTrainingConfig.
-    // NewAgentContext.rlt_actor_critic_buffer = rlt::malloc(rlt_device, rlt_context, sizeof(ACTUAL_ACTOR_CRITIC_TYPE));
-    // if (!NewAgentContext.rlt_actor_critic_buffer) { /* ... handle allocation failure & cleanup ... */ return false; }
-    // rlt::init(rlt_device, rlt_context, static_cast<ACTUAL_ACTOR_CRITIC_TYPE*>(NewAgentContext.rlt_actor_critic_buffer),
-    //           static_cast<ACTUAL_POLICY_TYPE*>(NewAgentContext.rlt_policy_buffer), // or actor network part
-    //           /* value_network_buffer (if separate), */
-    //           static_cast<ACTUAL_OPTIMIZER_TYPE*>(NewAgentContext.rlt_optimizer_buffer),
-    //           /* other_actor_critic_params_from_config */);
-    // TODO: Check AC initialization success.
+    // 4. Initialize Actor-Critic Structure (if applicable, e.g., for PPO)
+    using ACTOR_CRITIC_TYPE = rlt::rl::algorithms::ppo::ActorCritic<POLICY_TYPE, OPTIMIZER_TYPE>;
+    NewAgentContext.rlt_actor_critic_buffer = rlt::malloc(rlt_device, rlt_context, sizeof(ACTOR_CRITIC_TYPE));
+    if (!NewAgentContext.rlt_actor_critic_buffer) {
+        UE_LOG(LOG_UERLTOOLS, Error, TEXT("ConfigureAgent: Failed to allocate memory for actor-critic buffer for agent '%s'."), *AgentName.ToString());
+        if (NewAgentContext.rlt_optimizer_buffer) rlt::free(rlt_device, rlt_context, NewAgentContext.rlt_optimizer_buffer);
+        if (NewAgentContext.rlt_policy_buffer) rlt::free(rlt_device, rlt_context, NewAgentContext.rlt_policy_buffer);
+        return false;
+    }
+    rlt::init(rlt_device, rlt_context, static_cast<ACTOR_CRITIC_TYPE*>(NewAgentContext.rlt_actor_critic_buffer),
+              static_cast<POLICY_TYPE*>(NewAgentContext.rlt_policy_buffer),
+              static_cast<OPTIMIZER_TYPE*>(NewAgentContext.rlt_optimizer_buffer));
 
     // 5. Initialize Replay Buffer (for Off-Policy Algorithms like SAC, DDPG, DQN)
-    // TODO: Check if algorithm is off-policy based on TrainingConfig.
-    // TODO: Define ACTUAL_REPLAY_BUFFER_TYPE (e.g., rlt::rl::components::ReplayBuffer<REPLAY_BUFFER_SPEC>).
-    // TODO: Extract replay buffer capacity and other params from NewAgentContext.CurrentTrainingConfig.
-    // NewAgentContext.rlt_replay_buffer = rlt::malloc(rlt_device, rlt_context, sizeof(ACTUAL_REPLAY_BUFFER_TYPE));
-    // if (!NewAgentContext.rlt_replay_buffer) { /* ... handle allocation failure & cleanup ... */ return false; }
-    // rlt::init(rlt_device, rlt_context, static_cast<ACTUAL_REPLAY_BUFFER_TYPE*>(NewAgentContext.rlt_replay_buffer), observation_dim, action_dim /*, capacity, other_rb_params */);
-    // TODO: Check replay buffer initialization success.
+    // For demonstration, we always allocate a replay buffer; in production, check TrainingConfig.AlgorithmType.
+    using REPLAY_BUFFER_TYPE = rlt::rl::components::ReplayBuffer<float, observation_dim, action_dim, 10000>; // 10000 = buffer capacity
+    NewAgentContext.rlt_replay_buffer = rlt::malloc(rlt_device, rlt_context, sizeof(REPLAY_BUFFER_TYPE));
+    if (!NewAgentContext.rlt_replay_buffer) {
+        UE_LOG(LOG_UERLTOOLS, Error, TEXT("ConfigureAgent: Failed to allocate memory for replay buffer for agent '%s'."), *AgentName.ToString());
+        if (NewAgentContext.rlt_actor_critic_buffer) rlt::free(rlt_device, rlt_context, NewAgentContext.rlt_actor_critic_buffer);
+        if (NewAgentContext.rlt_optimizer_buffer) rlt::free(rlt_device, rlt_context, NewAgentContext.rlt_optimizer_buffer);
+        if (NewAgentContext.rlt_policy_buffer) rlt::free(rlt_device, rlt_context, NewAgentContext.rlt_policy_buffer);
+        return false;
+    }
+    rlt::init(rlt_device, rlt_context, static_cast<REPLAY_BUFFER_TYPE*>(NewAgentContext.rlt_replay_buffer));
 
     ManagedAgents.Add(AgentName, NewAgentContext);
     UE_LOG(LOG_UERLTOOLS, Log, TEXT("Agent '%s' configured."), *AgentName.ToString());
