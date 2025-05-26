@@ -1,6 +1,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+
+// Module-wide log categories
+#include "UERLLog.h"
+
 // #include "Path/To/URLEnvironmentComponent.h" // Include the actual header for URLEnvironmentComponent
 #include "RLToolsConversionUtils.h"
 
@@ -60,14 +64,14 @@ namespace rl_tools {
             // to set it to a known initial configuration.
             env.LinkedEnvComponent->ResetEnvironment(); 
         } else {
-            UE_LOG(LogTemp, Error, TEXT("UEEnvironmentAdapter::init - LinkedEnvComponent is null."));
+            UERL_RL_ERROR( TEXT("UEEnvironmentAdapter::init - LinkedEnvComponent is null."));
         }
     }
 
     template <typename T_DEVICE, typename T_ENVIRONMENT_SPEC>
     static void initial_state(T_DEVICE& device, UEEnvironmentAdapter<T_DEVICE, T_ENVIRONMENT_SPEC>& env, typename UEEnvironmentAdapter<T_DEVICE, T_ENVIRONMENT_SPEC>::State& state) {
         if (!env.LinkedEnvComponent) {
-            UE_LOG(LogTemp, Error, TEXT("UEEnvironmentAdapter::initial_state - LinkedEnvComponent is null."));
+            UERL_RL_ERROR( TEXT("UEEnvironmentAdapter::initial_state - LinkedEnvComponent is null."));
             return;
         }
 
@@ -80,7 +84,7 @@ namespace rl_tools {
         // or be fixed-size. We just fill it.
         bool bSuccess = RLToolsConversionUtils::UEArrayToRLMatrix(UEObservation, state.observation, env.ObservationNormParams);
         if (!bSuccess) {
-            UE_LOG(LogTemp, Error, TEXT("UEEnvironmentAdapter::initial_state - Failed to convert UE observation to RL_Tools matrix."));
+            UERL_RL_ERROR( TEXT("UEEnvironmentAdapter::initial_state - Failed to convert UE observation to RL_Tools matrix."));
             // Consider how to handle error: e.g., fill state.observation with zeros or a specific error pattern.
         }
         // state.episode_step_count = 0; // If tracking steps
@@ -95,14 +99,14 @@ namespace rl_tools {
         typename UEEnvironmentAdapter<T_DEVICE, T_ENVIRONMENT_SPEC>::State& next_rl_state // rl_tools next state to be populated
     ) {
         if (!env.LinkedEnvComponent) {
-            UE_LOG(LogTemp, Error, TEXT("UEEnvironmentAdapter::step - LinkedEnvComponent is null."));
+            UERL_RL_ERROR( TEXT("UEEnvironmentAdapter::step - LinkedEnvComponent is null."));
             return;
         }
 
         TArray<float> UEAction;
         bool bConversionSuccess = RLToolsConversionUtils::RLMatrixToUEArray(rl_action, UEAction, env.ActionNormParams);
         if (!bConversionSuccess) {
-            UE_LOG(LogTemp, Error, TEXT("UEEnvironmentAdapter::step - Failed to convert RL_Tools action to UEArray."));
+            UERL_RL_ERROR( TEXT("UEEnvironmentAdapter::step - Failed to convert RL_Tools action to UEArray."));
             // Handle error: e.g., take no action or a default safe action.
             // For now, just returning. The environment won't advance.
             // A robust implementation might set next_rl_state to reflect an error or terminal state.
@@ -117,7 +121,7 @@ namespace rl_tools {
         
         bConversionSuccess = RLToolsConversionUtils::UEArrayToRLMatrix(UENextObservation, next_rl_state.observation, env.ObservationNormParams);
         if (!bConversionSuccess) {
-            UE_LOG(LogTemp, Error, TEXT("UEEnvironmentAdapter::step - Failed to convert next UE observation to RL_Tools matrix."));
+            UERL_RL_ERROR( TEXT("UEEnvironmentAdapter::step - Failed to convert next UE observation to RL_Tools matrix."));
             // Handle error for next_rl_state.observation
         }
         // next_rl_state.episode_step_count = current_rl_state.episode_step_count + 1; // If tracking steps
@@ -145,7 +149,7 @@ namespace rl_tools {
         const typename UEEnvironmentAdapter<T_DEVICE, T_ENVIRONMENT_SPEC>::State& next_rl_state
     ) {
         if (!env.LinkedEnvComponent) {
-            UE_LOG(LogTemp, Error, TEXT("UEEnvironmentAdapter::reward - LinkedEnvComponent is null."));
+            UERL_RL_ERROR( TEXT("UEEnvironmentAdapter::reward - LinkedEnvComponent is null."));
             return static_cast<typename UEEnvironmentAdapter<T_DEVICE, T_ENVIRONMENT_SPEC>::T>(0.0f);
         }
         // Assumes GetCurrentReward() returns the reward resulting from the action that led to next_rl_state.
@@ -161,7 +165,7 @@ namespace rl_tools {
         const typename UEEnvironmentAdapter<T_DEVICE, T_ENVIRONMENT_SPEC>::State& next_rl_state
     ) {
         if (!env.LinkedEnvComponent) {
-            UE_LOG(LogTemp, Error, TEXT("UEEnvironmentAdapter::terminated - LinkedEnvComponent is null."));
+            UERL_RL_ERROR( TEXT("UEEnvironmentAdapter::terminated - LinkedEnvComponent is null."));
             return true; // Default to terminated on error to prevent potential infinite loops.
         }
         // Assumes IsDone() returns the termination status resulting from the action that led to next_rl_state.
@@ -263,7 +267,7 @@ namespace rl_tools {
     void init(DEVICE& device, UEEnvironmentAdapter<DEVICE, SPEC>& env, typename UEEnvironmentAdapter<DEVICE, SPEC>::Parameters& params) {
         // env.parameters = params; // If parameters are part of the adapter
         // Any other one-time setup for the adapter based on parameters.
-        // UE_LOG(LogTemp, Log, TEXT("UEEnvironmentAdapter initialized via rl_tools::init"));
+        // UERL_RL_LOG( TEXT("UEEnvironmentAdapter initialized via rl_tools::init"));
     }
 
     // Get the initial state of the environment
@@ -279,14 +283,14 @@ namespace rl_tools {
         //    Assuming SPEC::State is a Matrix<T, 1, SPEC::OBSERVATION_DIM> for now.
         //    This conversion logic will be part of Task 2.1.3.
         if (InitialObservationData.Num() != SPEC::OBSERVATION_DIM) {
-            UE_LOG(LogTemp, Error, TEXT("InitialObservationData.Num() [%d] != SPEC::OBSERVATION_DIM [%d]"), InitialObservationData.Num(), SPEC::OBSERVATION_DIM);
+            UERL_RL_ERROR( TEXT("InitialObservationData.Num() [%d] != SPEC::OBSERVATION_DIM [%d]"), InitialObservationData.Num(), SPEC::OBSERVATION_DIM);
             return;
         }
         // Example: rlt::Matrix<T, 1, SPEC::OBSERVATION_DIM>* obs_matrix = static_cast<rlt::Matrix<T, 1, SPEC::OBSERVATION_DIM>*>(&state);
         // for (typename DEVICE::index_t i = 0; i < SPEC::OBSERVATION_DIM; ++i) {
         //     obs_matrix->data[i] = static_cast<T>(InitialObservationData[i]);
         // }
-        UE_LOG(LogTemp, Warning, TEXT("initial_state: Data conversion from TArray to rl_tools State not fully implemented."));
+        UERL_RL_WARNING( TEXT("initial_state: Data conversion from TArray to rl_tools State not fully implemented."));
     }
 
     // Take a step in the environment
@@ -299,13 +303,13 @@ namespace rl_tools {
         // Example: for (typename DEVICE::index_t i = 0; i < SPEC::ACTION_DIM; ++i) {
         //     UEAction.Add(static_cast<float>(action.data[i]));
         // }
-        UE_LOG(LogTemp, Warning, TEXT("step: Action conversion from rl_tools Matrix to TArray not fully implemented."));
+        UERL_RL_WARNING( TEXT("step: Action conversion from rl_tools Matrix to TArray not fully implemented."));
 
         // 2. Apply action to UEEnvComponent
         if (UEAction.Num() == SPEC::ACTION_DIM) { // Basic check
              env.UEEnvComponent->ApplyAction(UEAction); // ApplyAction should internally update the UE environment's state
         } else {
-            UE_LOG(LogTemp, Error, TEXT("Step: Action dimension mismatch. Expected %d, Got %d"), SPEC::ACTION_DIM, UEAction.Num());
+            UERL_RL_ERROR( TEXT("Step: Action dimension mismatch. Expected %d, Got %d"), SPEC::ACTION_DIM, UEAction.Num());
         }
 
 
@@ -314,14 +318,14 @@ namespace rl_tools {
         // 4. Convert TArray<float> to rl_tools State type (next_state)
         //    Similar to initial_state conversion.
         if (NextObservationData.Num() != SPEC::OBSERVATION_DIM) {
-            UE_LOG(LogTemp, Error, TEXT("NextObservationData.Num() [%d] != SPEC::OBSERVATION_DIM [%d]"), NextObservationData.Num(), SPEC::OBSERVATION_DIM);
+            UERL_RL_ERROR( TEXT("NextObservationData.Num() [%d] != SPEC::OBSERVATION_DIM [%d]"), NextObservationData.Num(), SPEC::OBSERVATION_DIM);
             return;
         }
         // Example: rlt::Matrix<T, 1, SPEC::OBSERVATION_DIM>* next_obs_matrix = static_cast<rlt::Matrix<T, 1, SPEC::OBSERVATION_DIM>*>(&next_state);
         // for (typename DEVICE::index_t i = 0; i < SPEC::OBSERVATION_DIM; ++i) {
         //     next_obs_matrix->data[i] = static_cast<T>(NextObservationData[i]);
         // }
-        UE_LOG(LogTemp, Warning, TEXT("step: Next observation conversion from TArray to rl_tools State not fully implemented."));
+        UERL_RL_WARNING( TEXT("step: Next observation conversion from TArray to rl_tools State not fully implemented."));
     }
 
     // Observe the current state (might be redundant if step returns next_state directly)
@@ -333,13 +337,13 @@ namespace rl_tools {
         TArray<float> CurrentObservationData = env.UEEnvComponent->GetObservation();
         // 2. Convert TArray<float> to rl_tools Observation type (Matrix)
         if (CurrentObservationData.Num() != SPEC::OBSERVATION_DIM) {
-            UE_LOG(LogTemp, Error, TEXT("Observe: CurrentObservationData.Num() [%d] != SPEC::OBSERVATION_DIM [%d]"), CurrentObservationData.Num(), SPEC::OBSERVATION_DIM);
+            UERL_RL_ERROR( TEXT("Observe: CurrentObservationData.Num() [%d] != SPEC::OBSERVATION_DIM [%d]"), CurrentObservationData.Num(), SPEC::OBSERVATION_DIM);
             return;
         }
         // Example: for (typename DEVICE::index_t i = 0; i < SPEC::OBSERVATION_DIM; ++i) {
         //     observation_matrix.data[i] = static_cast<T>(CurrentObservationData[i]);
         // }
-        UE_LOG(LogTemp, Warning, TEXT("observe: Data conversion from TArray to rl_tools Observation not fully implemented."));
+        UERL_RL_WARNING( TEXT("observe: Data conversion from TArray to rl_tools Observation not fully implemented."));
     }
 
 

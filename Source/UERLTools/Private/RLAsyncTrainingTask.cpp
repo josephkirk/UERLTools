@@ -1,8 +1,11 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright 2025 NGUYEN PHI HUNG
 
 #include "RLAsyncTrainingTask.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+
+// Module-wide log categories
+#include "UERLLog.h"
 
 // FRLAsyncTrainingTask Implementation
 
@@ -27,7 +30,7 @@ void FRLAsyncTrainingTask::DoWork()
 		return;
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("FRLAsyncTrainingTask::DoWork - Starting async training"));
+	UERL_LOG( TEXT("FRLAsyncTrainingTask::DoWork - Starting async training"));
 
 	try
 	{
@@ -37,7 +40,7 @@ void FRLAsyncTrainingTask::DoWork()
 			bool bStepSuccess = AgentManager->StepTraining(1);
 			if (!bStepSuccess)
 			{
-				UE_LOG(LogTemp, Error, TEXT("FRLAsyncTrainingTask::DoWork - Training step failed"));
+				UERL_ERROR( TEXT("FRLAsyncTrainingTask::DoWork - Training step failed"));
 				break;
 			}
 
@@ -54,12 +57,12 @@ void FRLAsyncTrainingTask::DoWork()
 	}
 	catch (...)
 	{
-		UE_LOG(LogTemp, Error, TEXT("FRLAsyncTrainingTask::DoWork - Exception during training"));
+		UERL_ERROR( TEXT("FRLAsyncTrainingTask::DoWork - Exception during training"));
 		bWasSuccessful = false;
 	}
 
 	bIsComplete = true;
-	UE_LOG(LogTemp, Log, TEXT("FRLAsyncTrainingTask::DoWork - Training completed. Success: %s, Steps: %d"), 
+	UERL_LOG( TEXT("FRLAsyncTrainingTask::DoWork - Training completed. Success: %s, Steps: %d"), 
 		bWasSuccessful ? TEXT("True") : TEXT("False"), CurrentStep);
 }
 
@@ -75,13 +78,13 @@ bool URLAsyncTrainingTask::StartAsyncTraining(URLAgentManager* AgentManager, int
 {
 	if (!AgentManager)
 	{
-		UE_LOG(LogTemp, Error, TEXT("URLAsyncTrainingTask::StartAsyncTraining - AgentManager is null"));
+		UERL_ERROR( TEXT("URLAsyncTrainingTask::StartAsyncTraining - AgentManager is null"));
 		return false;
 	}
 
 	if (!AgentManager->IsInitialized())
 	{
-		UE_LOG(LogTemp, Error, TEXT("URLAsyncTrainingTask::StartAsyncTraining - AgentManager is not initialized"));
+		UERL_ERROR( TEXT("URLAsyncTrainingTask::StartAsyncTraining - AgentManager is not initialized"));
 		return false;
 	}
 
@@ -91,7 +94,7 @@ bool URLAsyncTrainingTask::StartAsyncTraining(URLAgentManager* AgentManager, int
 	// Start training on the agent manager
 	if (!AgentManager->StartTraining())
 	{
-		UE_LOG(LogTemp, Error, TEXT("URLAsyncTrainingTask::StartAsyncTraining - Failed to start training on AgentManager"));
+		UERL_ERROR( TEXT("URLAsyncTrainingTask::StartAsyncTraining - Failed to start training on AgentManager"));
 		return false;
 	}
 
@@ -111,7 +114,7 @@ bool URLAsyncTrainingTask::StartAsyncTraining(URLAgentManager* AgentManager, int
 		);
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("URLAsyncTrainingTask::StartAsyncTraining - Async training started"));
+	UERL_LOG( TEXT("URLAsyncTrainingTask::StartAsyncTraining - Async training started"));
 	return true;
 }
 
@@ -132,7 +135,7 @@ void URLAsyncTrainingTask::StopAsyncTraining()
 	}
 
 	CleanupTask();
-	UE_LOG(LogTemp, Log, TEXT("URLAsyncTrainingTask::StopAsyncTraining - Async training stopped"));
+	UERL_LOG( TEXT("URLAsyncTrainingTask::StopAsyncTraining - Async training stopped"));
 }
 
 bool URLAsyncTrainingTask::IsTrainingActive() const

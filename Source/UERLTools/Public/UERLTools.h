@@ -1,11 +1,17 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright 2025 NGUYEN PHI HUNG
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
 
-class FUERLToolsModule : public IModuleInterface
+// Module-wide log categories
+#include "UERLLog.h"
+
+/**
+ * The public interface to this module
+ */
+class UERLTOOLS_API FUERLToolsModule : public IModuleInterface
 {
 public:
 

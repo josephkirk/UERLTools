@@ -1,9 +1,12 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright 2025 NGUYEN PHI HUNG
 
 #include "RLAgentManager.h"
 #include "Engine/World.h"
 #include "HAL/PlatformFilemanager.h"
 #include <exception> // Required for std::exception
+
+// Module-wide log categories
+#include "UERLLog.h"
 
 URLAgentManager::URLAgentManager()
 {
@@ -30,7 +33,7 @@ bool URLAgentManager::InitializeAgent(URLEnvironmentComponent* InEnvironmentComp
 {
     if (!InEnvironmentComponent)
     {
-        UE_LOG(LogTemp, Error, TEXT("URLAgentManager::InitializeAgent() - Environment component is null"));
+        UERL_ERROR( TEXT("URLAgentManager::InitializeAgent() - Environment component is null"));
         return false;
     }
 
@@ -40,7 +43,7 @@ bool URLAgentManager::InitializeAgent(URLEnvironmentComponent* InEnvironmentComp
 
     if (!ValidateEnvironment()) // ValidateEnvironment might use EnvironmentComponent
     {
-        UE_LOG(LogTemp, Error, TEXT("URLAgentManager::InitializeAgent() - Environment validation failed"));
+        UERL_ERROR( TEXT("URLAgentManager::InitializeAgent() - Environment validation failed"));
         return false;
     }
 
@@ -51,18 +54,18 @@ bool URLAgentManager::InitializeAgent(URLEnvironmentComponent* InEnvironmentComp
         TI ObservationDim = EnvironmentComponent->GetObservationDim();
         TI ActionDim = EnvironmentComponent->GetActionDim();
 
-        UE_LOG(LogTemp, Log, TEXT("URLAgentManager::InitializeAgent() - Runtime Obs Dim: %d, Action Dim: %d"), ObservationDim, ActionDim);
-        UE_LOG(LogTemp, Log, TEXT("URLAgentManager::InitializeAgent() - Spec    Obs Dim: %d, Action Dim: %d"), UERLAgentEnvironmentSpec::OBSERVATION_DIM, UERLAgentEnvironmentSpec::ACTION_DIM);
+        UERL_LOG( TEXT("URLAgentManager::InitializeAgent() - Runtime Obs Dim: %d, Action Dim: %d"), ObservationDim, ActionDim);
+        UERL_LOG( TEXT("URLAgentManager::InitializeAgent() - Spec    Obs Dim: %d, Action Dim: %d"), UERLAgentEnvironmentSpec::OBSERVATION_DIM, UERLAgentEnvironmentSpec::ACTION_DIM);
 
         if (ObservationDim != UERLAgentEnvironmentSpec::OBSERVATION_DIM || ActionDim != UERLAgentEnvironmentSpec::ACTION_DIM)
         {
-            UE_LOG(LogTemp, Error, TEXT("URLAgentManager::InitializeAgent() - Environment dimensions (Obs: %d, Act: %d) do not match UERLAgentEnvironmentSpec dimensions (Obs: %d, Act: %d). Please update UERLAgentEnvironmentSpec in RLAgentManager.h or check environment component configuration."),
+            UERL_ERROR( TEXT("URLAgentManager::InitializeAgent() - Environment dimensions (Obs: %d, Act: %d) do not match UERLAgentEnvironmentSpec dimensions (Obs: %d, Act: %d). Please update UERLAgentEnvironmentSpec in RLAgentManager.h or check environment component configuration."),
                 ObservationDim, ActionDim, UERLAgentEnvironmentSpec::OBSERVATION_DIM, UERLAgentEnvironmentSpec::ACTION_DIM);
             return false;
         }
 
         EnvironmentAdapterInstance = new ENVIRONMENT_ADAPTER_TYPE(device, EnvironmentComponent, TrainingConfig.ObservationNormalizationParams, TrainingConfig.ActionNormalizationParams);
-        UE_LOG(LogTemp, Log, TEXT("URLAgentManager::InitializeAgent() - UEEnvironmentAdapter instantiated successfully."));
+        UERL_LOG( TEXT("URLAgentManager::InitializeAgent() - UEEnvironmentAdapter instantiated successfully."));
 
         // ... (placeholder for actual network initialization) ...
         // For example, if ActorNetwork and CriticNetwork were to be initialized here:
@@ -74,19 +77,19 @@ bool URLAgentManager::InitializeAgent(URLEnvironmentComponent* InEnvironmentComp
         // rlt::init_weights(device, *CriticNetwork, device.random_float_cpu);
 
         bIsInitialized = true;
-        UE_LOG(LogTemp, Log, TEXT("URLAgentManager::InitializeAgent() - Agent initialized successfully"));
+        UERL_LOG( TEXT("URLAgentManager::InitializeAgent() - Agent initialized successfully"));
         return true;
     }
     catch (const std::exception& e)
     {
-        UE_LOG(LogTemp, Error, TEXT("URLAgentManager::InitializeAgent() - Standard exception during initialization: %s"), ANSI_TO_TCHAR(e.what()));
+        UERL_ERROR( TEXT("URLAgentManager::InitializeAgent() - Standard exception during initialization: %s"), ANSI_TO_TCHAR(e.what()));
         CleanupNetworks();
         bIsInitialized = false;
         return false;
     }
     catch (...)
     {
-        UE_LOG(LogTemp, Error, TEXT("URLAgentManager::InitializeAgent() - Unknown exception during initialization"));
+        UERL_ERROR( TEXT("URLAgentManager::InitializeAgent() - Unknown exception during initialization"));
         CleanupNetworks();
         bIsInitialized = false;
         return false;
@@ -97,13 +100,13 @@ bool URLAgentManager::StartTraining()
 {
 	if (!bIsInitialized)
 	{
-		UE_LOG(LogTemp, Error, TEXT("URLAgentManager::StartTraining() - Agent not initialized"));
+		UERL_ERROR( TEXT("URLAgentManager::StartTraining() - Agent not initialized"));
 		return false;
 	}
 
 	if (TrainingStatus.bIsTraining)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("URLAgentManager::StartTraining() - Training already in progress"));
+		UERL_WARNING( TEXT("URLAgentManager::StartTraining() - Training already in progress"));
 		return true;
 	}
 
@@ -116,7 +119,7 @@ bool URLAgentManager::StartTraining()
 	// Reset environment
 	CurrentObservation = EnvironmentComponent->Reset();
 
-	UE_LOG(LogTemp, Log, TEXT("URLAgentManager::StartTraining() - Training started"));
+	UERL_LOG( TEXT("URLAgentManager::StartTraining() - Training started"));
 	return true;
 }
 
@@ -125,7 +128,7 @@ void URLAgentManager::PauseTraining()
 	if (TrainingStatus.bIsTraining)
 	{
 		bTrainingPaused = true;
-		UE_LOG(LogTemp, Log, TEXT("URLAgentManager::PauseTraining() - Training paused"));
+		UERL_LOG( TEXT("URLAgentManager::PauseTraining() - Training paused"));
 	}
 }
 
@@ -134,7 +137,7 @@ void URLAgentManager::ResumeTraining()
 	if (TrainingStatus.bIsTraining && bTrainingPaused)
 	{
 		bTrainingPaused = false;
-		UE_LOG(LogTemp, Log, TEXT("URLAgentManager::ResumeTraining() - Training resumed"));
+		UERL_LOG( TEXT("URLAgentManager::ResumeTraining() - Training resumed"));
 	}
 }
 
@@ -144,7 +147,7 @@ void URLAgentManager::StopTraining()
 	{
 		TrainingStatus.bIsTraining = false;
 		bTrainingPaused = false;
-		UE_LOG(LogTemp, Log, TEXT("URLAgentManager::StopTraining() - Training stopped"));
+		UERL_LOG( TEXT("URLAgentManager::StopTraining() - Training stopped"));
 		
 		OnTrainingFinished.Broadcast(true);
 	}
@@ -179,14 +182,14 @@ TArray<float> URLAgentManager::GetAction(const TArray<float>& Observation)
 {
 	if (!bIsInitialized)
 	{
-		UE_LOG(LogTemp, Error, TEXT("URLAgentManager::GetAction() - Agent not initialized"));
+		UERL_ERROR( TEXT("URLAgentManager::GetAction() - Agent not initialized"));
 		return TArray<float>();
 	}
 
 	// Validate observation
 	if (Observation.Num() != EnvironmentComponent->GetObservationDim())
 	{
-		UE_LOG(LogTemp, Error, TEXT("URLAgentManager::GetAction() - Invalid observation dimension"));
+		UERL_ERROR( TEXT("URLAgentManager::GetAction() - Invalid observation dimension"));
 		return TArray<float>();
 	}
 
@@ -207,7 +210,7 @@ bool URLAgentManager::LoadPolicy(const FString& FilePath)
 {
 	if (!bIsInitialized)
 	{
-		UE_LOG(LogTemp, Error, TEXT("URLAgentManager::LoadPolicy() - Agent not initialized"));
+		UERL_ERROR( TEXT("URLAgentManager::LoadPolicy() - Agent not initialized"));
 		OnPolicyLoaded.Broadcast(false);
 		return false;
 	}
@@ -215,13 +218,13 @@ bool URLAgentManager::LoadPolicy(const FString& FilePath)
 	// Check if file exists
 	if (!FPlatformFileManager::Get().GetPlatformFile().FileExists(*FilePath))
 	{
-		UE_LOG(LogTemp, Error, TEXT("URLAgentManager::LoadPolicy() - File does not exist: %s"), *FilePath);
+		UERL_ERROR( TEXT("URLAgentManager::LoadPolicy() - File does not exist: %s"), *FilePath);
 		OnPolicyLoaded.Broadcast(false);
 		return false;
 	}
 
 	// Placeholder for actual policy loading
-	UE_LOG(LogTemp, Log, TEXT("URLAgentManager::LoadPolicy() - Policy loading not yet implemented"));
+	UERL_LOG( TEXT("URLAgentManager::LoadPolicy() - Policy loading not yet implemented"));
 	OnPolicyLoaded.Broadcast(true);
 	return true;
 }
@@ -230,13 +233,13 @@ bool URLAgentManager::SavePolicy(const FString& FilePath)
 {
 	if (!bIsInitialized)
 	{
-		UE_LOG(LogTemp, Error, TEXT("URLAgentManager::SavePolicy() - Agent not initialized"));
+		UERL_ERROR( TEXT("URLAgentManager::SavePolicy() - Agent not initialized"));
 		OnPolicySaved.Broadcast(false);
 		return false;
 	}
 
 	// Placeholder for actual policy saving
-	UE_LOG(LogTemp, Log, TEXT("URLAgentManager::SavePolicy() - Policy saving not yet implemented"));
+	UERL_LOG( TEXT("URLAgentManager::SavePolicy() - Policy saving not yet implemented"));
 	OnPolicySaved.Broadcast(true);
 	return true;
 }
@@ -265,7 +268,7 @@ void URLAgentManager::LogTrainingProgress()
 {
 	if (TrainingStatus.CurrentStep % 1000 == 0)
 	{
-		UE_LOG(LogTemp, Log, TEXT("Training Step: %d, Episode: %d, Avg Reward: %.2f"), 
+		UERL_LOG( TEXT("Training Step: %d, Episode: %d, Avg Reward: %.2f"), 
 			TrainingStatus.CurrentStep, TrainingStatus.CurrentEpisode, TrainingStatus.AverageReward);
 	}
 }
@@ -286,13 +289,13 @@ bool URLAgentManager::ValidateEnvironment() const
 
 void URLAgentManager::CleanupNetworks()
 {
-    UE_LOG(LogTemp, Log, TEXT("URLAgentManager::CleanupNetworks() - Cleaning up networks and adapter..."));
+    UERL_LOG( TEXT("URLAgentManager::CleanupNetworks() - Cleaning up networks and adapter..."));
 
     if (EnvironmentAdapterInstance)
     {
         delete EnvironmentAdapterInstance;
         EnvironmentAdapterInstance = nullptr;
-        UE_LOG(LogTemp, Log, TEXT("URLAgentManager::CleanupNetworks() - UEEnvironmentAdapter cleaned up."));
+        UERL_LOG( TEXT("URLAgentManager::CleanupNetworks() - UEEnvironmentAdapter cleaned up."));
     }
 
     // ... (cleanup for ActorNetwork, CriticNetwork, etc.) ...
@@ -307,13 +310,13 @@ void URLAgentManager::CleanupNetworks()
     //     delete CriticNetwork;
     //     CriticNetwork = nullptr;
     // }
-    UE_LOG(LogTemp, Log, TEXT("URLAgentManager::CleanupNetworks() - Placeholder for Actor/Critic network cleanup."));
+    UERL_LOG( TEXT("URLAgentManager::CleanupNetworks() - Placeholder for Actor/Critic network cleanup."));
 }
 
 URLAgentManager::~URLAgentManager()
 {
     CleanupNetworks();
-    UE_LOG(LogTemp, Log, TEXT("URLAgentManager destroyed."));
+    UERL_LOG( TEXT("URLAgentManager destroyed."));
 }
 
 bool URLAgentManager::PerformTrainingStep()

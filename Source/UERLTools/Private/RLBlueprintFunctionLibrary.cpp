@@ -1,14 +1,17 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright 2025 NGUYEN PHI HUNG
 
 #include "RLBlueprintFunctionLibrary.h"
 #include "Engine/World.h"
 #include "Components/ActorComponent.h"
 
+// Module-wide log categories
+#include "UERLLog.h"
+
 URLEnvironmentComponent* URLBlueprintFunctionLibrary::CreateRLEnvironmentComponent(AActor* Owner, const FRLEnvironmentConfig& Config)
 {
 	if (!Owner)
 	{
-		UE_LOG(LogTemp, Error, TEXT("URLBlueprintFunctionLibrary::CreateRLEnvironmentComponent - Owner is null"));
+		UERL_ERROR( TEXT("URLBlueprintFunctionLibrary::CreateRLEnvironmentComponent - Owner is null"));
 		return nullptr;
 	}
 
@@ -19,7 +22,7 @@ URLEnvironmentComponent* URLBlueprintFunctionLibrary::CreateRLEnvironmentCompone
 		Owner->AddOwnedComponent(Component);
 		Component->RegisterComponent();
 		
-		UE_LOG(LogTemp, Log, TEXT("URLBlueprintFunctionLibrary::CreateRLEnvironmentComponent - Component created successfully"));
+		UERL_LOG( TEXT("URLBlueprintFunctionLibrary::CreateRLEnvironmentComponent - Component created successfully"));
 	}
 
 	return Component;
@@ -46,7 +49,7 @@ URLAgentManager* URLBlueprintFunctionLibrary::CreateRLAgentManager(UObject* Oute
 	URLAgentManager* AgentManager = NewObject<URLAgentManager>(Outer);
 	if (AgentManager)
 	{
-		UE_LOG(LogTemp, Log, TEXT("URLBlueprintFunctionLibrary::CreateRLAgentManager - Agent manager created successfully"));
+		UERL_LOG( TEXT("URLBlueprintFunctionLibrary::CreateRLAgentManager - Agent manager created successfully"));
 	}
 
 	return AgentManager;
@@ -188,7 +191,7 @@ bool URLBlueprintFunctionLibrary::ValidateObservation(const TArray<float>& Obser
 {
 	if (Observation.Num() != ExpectedDimension)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("URLBlueprintFunctionLibrary::ValidateObservation - Dimension mismatch. Expected: %d, Got: %d"), 
+		UERL_WARNING( TEXT("URLBlueprintFunctionLibrary::ValidateObservation - Dimension mismatch. Expected: %d, Got: %d"), 
 			ExpectedDimension, Observation.Num());
 		return false;
 	}
@@ -198,7 +201,7 @@ bool URLBlueprintFunctionLibrary::ValidateObservation(const TArray<float>& Obser
 	{
 		if (!FMath::IsFinite(Observation[i]))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("URLBlueprintFunctionLibrary::ValidateObservation - Invalid value at index %d: %f"), 
+			UERL_WARNING( TEXT("URLBlueprintFunctionLibrary::ValidateObservation - Invalid value at index %d: %f"), 
 				i, Observation[i]);
 			return false;
 		}
@@ -211,7 +214,7 @@ bool URLBlueprintFunctionLibrary::ValidateAction(const TArray<float>& Action, in
 {
 	if (Action.Num() != ExpectedDimension)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("URLBlueprintFunctionLibrary::ValidateAction - Dimension mismatch. Expected: %d, Got: %d"), 
+		UERL_WARNING( TEXT("URLBlueprintFunctionLibrary::ValidateAction - Dimension mismatch. Expected: %d, Got: %d"), 
 			ExpectedDimension, Action.Num());
 		return false;
 	}
@@ -221,7 +224,7 @@ bool URLBlueprintFunctionLibrary::ValidateAction(const TArray<float>& Action, in
 	{
 		if (!FMath::IsFinite(Action[i]))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("URLBlueprintFunctionLibrary::ValidateAction - Invalid value at index %d: %f"), 
+			UERL_WARNING( TEXT("URLBlueprintFunctionLibrary::ValidateAction - Invalid value at index %d: %f"), 
 				i, Action[i]);
 			return false;
 		}
@@ -244,16 +247,16 @@ void URLBlueprintFunctionLibrary::LogFloatArray(const TArray<float>& Array, cons
 	}
 	
 	ArrayString += TEXT("]");
-	UE_LOG(LogTemp, Log, TEXT("%s"), *ArrayString);
+	UERL_LOG( TEXT("%s"), *ArrayString);
 }
 
 void URLBlueprintFunctionLibrary::LogTrainingStatus(const FRLTrainingStatus& Status)
 {
-	UE_LOG(LogTemp, Log, TEXT("Training Status:"));
-	UE_LOG(LogTemp, Log, TEXT("  Is Training: %s"), Status.bIsTraining ? TEXT("True") : TEXT("False"));
-	UE_LOG(LogTemp, Log, TEXT("  Current Step: %d"), Status.CurrentStep);
-	UE_LOG(LogTemp, Log, TEXT("  Current Episode: %d"), Status.CurrentEpisode);
-	UE_LOG(LogTemp, Log, TEXT("  Average Reward: %.3f"), Status.AverageReward);
-	UE_LOG(LogTemp, Log, TEXT("  Last Episode Reward: %.3f"), Status.LastEpisodeReward);
-	UE_LOG(LogTemp, Log, TEXT("  Replay Buffer Size: %d"), Status.ReplayBufferSize);
+	UERL_LOG( TEXT("Training Status:"));
+	UERL_LOG( TEXT("  Is Training: %s"), Status.bIsTraining ? TEXT("True") : TEXT("False"));
+	UERL_LOG( TEXT("  Current Step: %d"), Status.CurrentStep);
+	UERL_LOG( TEXT("  Current Episode: %d"), Status.CurrentEpisode);
+	UERL_LOG( TEXT("  Average Reward: %.3f"), Status.AverageReward);
+	UERL_LOG( TEXT("  Last Episode Reward: %.3f"), Status.LastEpisodeReward);
+	UERL_LOG( TEXT("  Replay Buffer Size: %d"), Status.ReplayBufferSize);
 }

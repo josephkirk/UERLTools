@@ -96,7 +96,7 @@ AMyTestActor::AMyTestActor()
     // Or using the factory:
     // using DEVICE = rlt::devices::DEVICE_FACTORY<rlt::devices::DefaultCPUSpecification>;
     // DEVICE device_instance;
-    UE_LOG(LogTemp, Warning, TEXT("RLtools types seem accessible."));
+    UERL_WARNING( TEXT("RLtools types seem accessible."));
 }
 
 
@@ -313,7 +313,7 @@ void ARLTrainingManager::BeginPlay()
     rlt::init(device, loop_state, seed); 
 
     bIsTrainingInitialized = true;
-    UE_LOG(LogTemp, Warning, TEXT("RLtools training initialized."));
+    UERL_WARNING( TEXT("RLtools training initialized."));
 }
 
 void ARLTrainingManager::Tick(float DeltaTime)
@@ -330,13 +330,13 @@ void ARLTrainingManager::Tick(float DeltaTime)
 
         if (current_step % 1000 == 0) // Log progress
         {
-            UE_LOG(LogTemp, Log, TEXT("Training step: %d"), current_step);
+            UERL_LOG( TEXT("Training step: %d"), current_step);
             // Add logic for evaluation, checkpointing, etc.
         }
 
         if (current_step >= max_training_steps)
         {
-            UE_LOG(LogTemp, Warning, TEXT("Max training steps reached."));
+            UERL_WARNING( TEXT("Max training steps reached."));
             // Save final model, etc.
         }
     }

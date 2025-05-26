@@ -1,6 +1,7 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright 2025 NGUYEN PHI HUNG
 
 #include "RLToolsTest.h"
+#include "UERLLog.h"
 #include "Engine/Engine.h"
 
 THIRD_PARTY_INCLUDES_START
@@ -9,6 +10,9 @@ THIRD_PARTY_INCLUDES_START
 #include "rl_tools/nn/layers/dense/layer.h"
 #include "rl_tools/nn_models/mlp/network.h"
 THIRD_PARTY_INCLUDES_END
+
+// Module-wide log categories
+#include "UERLLog.h"
 
 URLToolsTest::URLToolsTest()
 {
@@ -56,7 +60,7 @@ bool URLToolsTest::TestRLToolsIntegration()
 				FString::Printf(TEXT("RLTools integration test successful! Matrix sum: %f"), sum));
 		}
 		
-		UE_LOG(LogTemp, Log, TEXT("RLTools integration test successful! Matrix sum: %f"), sum);
+		UERL_RL_LOG("Integration test successful! Matrix sum: %f", sum);
 		
 		return true;
 	}
@@ -69,7 +73,7 @@ bool URLToolsTest::TestRLToolsIntegration()
 				TEXT("RLTools integration test failed!"));
 		}
 		
-		UE_LOG(LogTemp, Error, TEXT("RLTools integration test failed!"));
+		UERL_RL_ERROR("Integration test failed!");
 		
 		return false;
 	}

@@ -1,6 +1,9 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright 2025 NGUYEN PHI HUNG
 
 #include "RLEnvironmentComponent.h"
+
+// Module-wide log categories
+#include "UERLLog.h"
 
 URLEnvironmentComponent::URLEnvironmentComponent()
 {
@@ -34,7 +37,7 @@ void URLEnvironmentComponent::ResetEnvironment()
     // Validate observation dimension
     if (CachedObservation.Num() != EnvironmentConfig.ObservationDim)
     {
-        UE_LOG(LogTemp, Warning, TEXT("URLEnvironmentComponent::ResetEnvironment - Observation dimension mismatch. Expected %d, Got %d from BP_HandleReset. Resizing and padding/truncating."), EnvironmentConfig.ObservationDim, CachedObservation.Num());
+        UERL_WARNING( TEXT("URLEnvironmentComponent::ResetEnvironment - Observation dimension mismatch. Expected %d, Got %d from BP_HandleReset. Resizing and padding/truncating."), EnvironmentConfig.ObservationDim, CachedObservation.Num());
         CachedObservation.SetNumZeroed(EnvironmentConfig.ObservationDim); // Ensures correct size
     }
 
@@ -45,7 +48,7 @@ void URLEnvironmentComponent::StepAction(const TArray<float>& Action)
 {
     if (IsDone())
     {
-        UE_LOG(LogTemp, Warning, TEXT("URLEnvironmentComponent::StepAction called on a finished episode (Terminated: %s, Truncated: %s). Please ResetEnvironment first."), bIsTerminatedState ? TEXT("True") : TEXT("False"), bIsTruncatedState ? TEXT("True") : TEXT("False"));
+        UERL_WARNING( TEXT("URLEnvironmentComponent::StepAction called on a finished episode (Terminated: %s, Truncated: %s). Please ResetEnvironment first."), bIsTerminatedState ? TEXT("True") : TEXT("False"), bIsTruncatedState ? TEXT("True") : TEXT("False"));
         // Broadcast current (terminal) state again or do nothing to prevent further state changes.
         OnEnvironmentStepComplete.Broadcast(CachedObservation, CachedReward, bIsTerminatedState, bIsTruncatedState);
         return;
@@ -54,7 +57,7 @@ void URLEnvironmentComponent::StepAction(const TArray<float>& Action)
     // Validate action dimension for continuous actions
     if (EnvironmentConfig.bContinuousActions && Action.Num() != EnvironmentConfig.ActionDim)
     {
-        UE_LOG(LogTemp, Error, TEXT("URLEnvironmentComponent::StepAction - Action dimension mismatch for continuous actions. Expected %d, Got %d. Action will be ignored or may cause errors in BP_HandleStep."), EnvironmentConfig.ActionDim, Action.Num());
+        UERL_ERROR( TEXT("URLEnvironmentComponent::StepAction - Action dimension mismatch for continuous actions. Expected %d, Got %d. Action will be ignored or may cause errors in BP_HandleStep."), EnvironmentConfig.ActionDim, Action.Num());
         // Potentially return or use a default/empty action to prevent BP errors with wrong action size.
         // For now, proceeding, but this is a risky state.
     }
@@ -84,7 +87,7 @@ void URLEnvironmentComponent::StepAction(const TArray<float>& Action)
     // Validate observation dimension after step
     if (CachedObservation.Num() != EnvironmentConfig.ObservationDim)
     {
-        UE_LOG(LogTemp, Warning, TEXT("URLEnvironmentComponent::StepAction - Observation dimension mismatch after step. Expected %d, Got %d from BP_CalculateObservation. Resizing and padding/truncating."), EnvironmentConfig.ObservationDim, CachedObservation.Num());
+        UERL_WARNING( TEXT("URLEnvironmentComponent::StepAction - Observation dimension mismatch after step. Expected %d, Got %d from BP_CalculateObservation. Resizing and padding/truncating."), EnvironmentConfig.ObservationDim, CachedObservation.Num());
         CachedObservation.SetNumZeroed(EnvironmentConfig.ObservationDim); // Ensures correct size
     }
 
@@ -165,13 +168,13 @@ TArray<float> URLEnvironmentComponent::Reset()
 	{
 		// Default implementation - return zeros
 		InitialObservation.Init(0.0f, EnvironmentConfig.ObservationDim);
-		UE_LOG(LogTemp, Warning, TEXT("URLEnvironmentComponent::Reset() - Using default implementation. Override BP_OnReset for custom behavior."));
+		UERL_WARNING( TEXT("URLEnvironmentComponent::Reset() - Using default implementation. Override BP_OnReset for custom behavior."));
 	}
 
 	// Validate observation dimension
 	if (InitialObservation.Num() != EnvironmentConfig.ObservationDim)
 	{
-		UE_LOG(LogTemp, Error, TEXT("URLEnvironmentComponent::Reset() - Observation dimension mismatch. Expected: %d, Got: %d"), 
+		UERL_ERROR( TEXT("URLEnvironmentComponent::Reset() - Observation dimension mismatch. Expected: %d, Got: %d"), 
 			EnvironmentConfig.ObservationDim, InitialObservation.Num());
 		InitialObservation.SetNum(EnvironmentConfig.ObservationDim);
 	}
@@ -189,7 +192,7 @@ void URLEnvironmentComponent::Step(const TArray<float>& Action)
 	// Validate action dimension
 	if (Action.Num() != EnvironmentConfig.ActionDim)
 	{
-		UE_LOG(LogTemp, Error, TEXT("URLEnvironmentComponent::Step() - Action dimension mismatch. Expected: %d, Got: %d"), 
+		UERL_ERROR( TEXT("URLEnvironmentComponent::Step() - Action dimension mismatch. Expected: %d, Got: %d"), 
 			EnvironmentConfig.ActionDim, Action.Num());
 		return;
 	}
@@ -197,7 +200,7 @@ void URLEnvironmentComponent::Step(const TArray<float>& Action)
 	// Don't step if episode is already finished
 	if (IsEpisodeFinished())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("URLEnvironmentComponent::Step() - Trying to step finished episode. Call Reset() first."));
+		UERL_WARNING( TEXT("URLEnvironmentComponent::Step() - Trying to step finished episode. Call Reset() first."));
 		return;
 	}
 
@@ -211,7 +214,7 @@ void URLEnvironmentComponent::Step(const TArray<float>& Action)
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("URLEnvironmentComponent::Step() - Using default implementation. Override BP_OnStep for custom behavior."));
+		UERL_WARNING( TEXT("URLEnvironmentComponent::Step() - Using default implementation. Override BP_OnStep for custom behavior."));
 	}
 
 	// Get next observation
@@ -252,13 +255,13 @@ TArray<float> URLEnvironmentComponent::GetObservation()
 		{
 			Observation.Init(0.0f, EnvironmentConfig.ObservationDim);
 		}
-		UE_LOG(LogTemp, Warning, TEXT("URLEnvironmentComponent::GetObservation() - Using default implementation. Override BP_GetObservation for custom behavior."));
+		UERL_WARNING( TEXT("URLEnvironmentComponent::GetObservation() - Using default implementation. Override BP_GetObservation for custom behavior."));
 	}
 
 	// Validate observation dimension
 	if (Observation.Num() != EnvironmentConfig.ObservationDim)
 	{
-		UE_LOG(LogTemp, Error, TEXT("URLEnvironmentComponent::GetObservation() - Observation dimension mismatch. Expected: %d, Got: %d"), 
+		UERL_ERROR( TEXT("URLEnvironmentComponent::GetObservation() - Observation dimension mismatch. Expected: %d, Got: %d"), 
 			EnvironmentConfig.ObservationDim, Observation.Num());
 		Observation.SetNum(EnvironmentConfig.ObservationDim);
 	}
@@ -278,7 +281,7 @@ float URLEnvironmentComponent::CalculateReward()
 	else
 	{
 		// Default implementation - return 0
-		UE_LOG(LogTemp, Warning, TEXT("URLEnvironmentComponent::CalculateReward() - Using default implementation. Override BP_CalculateReward for custom behavior."));
+		UERL_WARNING( TEXT("URLEnvironmentComponent::CalculateReward() - Using default implementation. Override BP_CalculateReward for custom behavior."));
 	}
 
 	return Reward;
@@ -296,7 +299,7 @@ bool URLEnvironmentComponent::CheckTerminated()
 	else
 	{
 		// Default implementation - never terminate
-		UE_LOG(LogTemp, Warning, TEXT("URLEnvironmentComponent::CheckTerminated() - Using default implementation. Override BP_CheckTerminated for custom behavior."));
+		UERL_WARNING( TEXT("URLEnvironmentComponent::CheckTerminated() - Using default implementation. Override BP_CheckTerminated for custom behavior."));
 	}
 
 	return bTerminated;

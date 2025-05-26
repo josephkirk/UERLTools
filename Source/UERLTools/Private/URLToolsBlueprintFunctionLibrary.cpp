@@ -1,4 +1,4 @@
-// Copyright Windsurf Engineering, Inc. All Rights Reserved.
+// Copyright 2025 NGUYEN PHI HUNG
 
 #include "URLToolsBlueprintFunctionLibrary.h"
 #include "RLToolsConversionUtils.h" // For actual conversion logic

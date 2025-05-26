@@ -1,8 +1,11 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright 2025 NGUYEN PHI HUNG
 
 #include "RLSimpleTargetEnvironment.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
+
+// Module-wide log categories
+#include "UERLLog.h"
 
 URLSimpleTargetEnvironment::URLSimpleTargetEnvironment()
 {
@@ -84,7 +87,7 @@ void URLSimpleTargetEnvironment::Step(const TArray<float>& Action)
 	// Validate action
 	if (Action.Num() != EnvironmentConfig.ActionDim)
 	{
-		UE_LOG(LogTemp, Error, TEXT("URLSimpleTargetEnvironment::Step - Invalid action dimension"));
+		UERL_ERROR( TEXT("URLSimpleTargetEnvironment::Step - Invalid action dimension"));
 		return;
 	}
 

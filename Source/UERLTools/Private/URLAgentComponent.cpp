@@ -1,11 +1,15 @@
-// Copyright Windsurf Systems, Inc. All Rights Reserved.
+// Copyright 2025 NGUYEN PHI HUNG
 
 #include "URLAgentComponent.h"
 #include "URLEnvironmentComponent.h"
 #include "Subsystems/URLAgentManagerSubsystem.h"
+#include "UERLLog.h"
 #include "GameFramework/Actor.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
+
+// Module-wide log categories
+#include "UERLLog.h"
 
 UURLAgentComponent::UURLAgentComponent()
 {
@@ -28,7 +32,7 @@ void UURLAgentComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
         // TODO: Consider if RemoveAgent should be called here or managed explicitly by the user.
         // For now, we'll let the user manage removal to prevent accidental unregistration during PIE.
         // AgentManager->RemoveAgent(AgentId);
-        UE_LOG(LogTemp, Log, TEXT("URLAgentComponent (%s) EndPlay. Consider manual RemoveAgent if needed."), *AgentId.ToString());
+        UERL_URL_LOG("Agent component (%s) EndPlay. Consider manual RemoveAgent if needed.", *AgentId.ToString());
     }
     Super::EndPlay(EndPlayReason);
 }
@@ -52,7 +56,7 @@ void UURLAgentComponent::InitializeAgent()
     AgentManager = GetAgentManager();
     if (!AgentManager)
     {
-        UE_LOG(LogTemp, Error, TEXT("URLAgentComponent: Could not get URLAgentManagerSubsystem. Agent cannot be initialized."));
+        UERL_URL_ERROR("Could not get URLAgentManagerSubsystem. Agent cannot be initialized.");
         return;
     }
 
@@ -63,11 +67,11 @@ void UURLAgentComponent::InitializeAgent()
         if (OwnerActor)
         {
             AgentId = FName(*(OwnerActor->GetName() + TEXT("_") + GetName()));
-            UE_LOG(LogTemp, Warning, TEXT("URLAgentComponent: AgentId was None, automatically set to '%s'. Consider setting a unique AgentId explicitly."), *AgentId.ToString());
+            UERL_URL_WARNING("AgentId was None, automatically set to '%s'. Consider setting a unique AgentId explicitly.", *AgentId.ToString());
         }
         else
         {
-            UE_LOG(LogTemp, Error, TEXT("URLAgentComponent: AgentId is None and no owner actor to generate one. Agent cannot be initialized. Please set AgentId."));
+            UERL_URL_ERROR("AgentId is None and no owner actor to generate one. Agent cannot be initialized. Please set AgentId.");
             return;
         }
     }
@@ -83,8 +87,7 @@ void UURLAgentComponent::InitializeAgent()
     FRLTrainingConfig DummyTrainingConfig; // This is a placeholder
     AgentManager->ConfigureAgent(AgentId, DummyTrainingConfig, AssociatedEnvironment);
 
-
-    UE_LOG(LogTemp, Log, TEXT("URLAgentComponent (%s) initialized and registered with AgentManager."), *AgentId.ToString());
+    UERL_URL_LOG("Agent component (%s) initialized and registered with AgentManager.", *AgentId.ToString());
 
     // TODO: Subscribe to relevant delegates from AgentManager if needed, e.g., OnPolicyUpdated for this AgentId.
 }
@@ -93,12 +96,12 @@ void UURLAgentComponent::RequestAction()
 {
     if (!AgentManager)
     {
-        UE_LOG(LogTemp, Warning, TEXT("URLAgentComponent (%s): AgentManager not available. Cannot request action."), *AgentId.ToString());
+        UERL_URL_WARNING("Agent component (%s): AgentManager not available. Cannot request action.", *AgentId.ToString());
         return;
     }
     if (AgentId == NAME_None)
     {
-        UE_LOG(LogTemp, Warning, TEXT("URLAgentComponent: AgentId is None. Cannot request action. InitializeAgent first."), *AgentId.ToString());
+        UERL_URL_WARNING("AgentId is None. Cannot request action. InitializeAgent first.");
         return;
     }
 
@@ -106,13 +109,13 @@ void UURLAgentComponent::RequestAction()
     // or the observation might be pushed to the manager separately.
     // For now, GetAction just needs the AgentId.
     AgentManager->GetAction(AgentId);
-    UE_LOG(LogTemp, Verbose, TEXT("URLAgentComponent (%s) requested action."), *AgentId.ToString());
+    UERL_URL_LOG("Agent component (%s) requested action.", *AgentId.ToString());
 }
 
 void UURLAgentComponent::OnPolicyUpdated()
 {
     // This might be called by the AgentManager when a new policy is loaded for this agent.
-    UE_LOG(LogTemp, Log, TEXT("URLAgentComponent (%s): Policy updated (placeholder)."), *AgentId.ToString());
+    UERL_URL_LOG("Agent component (%s): Policy updated (placeholder).", *AgentId.ToString());
     // TODO: Implement logic if the agent needs to react to policy updates directly.
 }
 
@@ -120,18 +123,19 @@ void UURLAgentComponent::ReceiveAction(const TArray<float>& Action)
 {
     // This would be called by the AgentManager after an action is computed.
     // Typically, the agent would then apply this action to its AssociatedEnvironment.
-    UE_LOG(LogTemp, Log, TEXT("URLAgentComponent (%s): Received action (placeholder): %s"), *AgentId.ToString(), *FString::Join(Action.ConvertAll<FString>([](float val){ return FString::SanitizeFloat(val); }), TEXT(",")));
+    UERL_URL_LOG("Agent component (%s): Received action (placeholder): %s", *AgentId.ToString(), 
+        *FString::Join(Action.ConvertAll<FString>([](float val){ return FString::SanitizeFloat(val); }), TEXT(",")));
 
     if (AssociatedEnvironment)
     {
         // TODO: Ensure the action format matches what AssociatedEnvironment expects.
         // This is a direct application. Consider if any transformation or buffering is needed.
         // AssociatedEnvironment->StepAction(Action);
-        UE_LOG(LogTemp, Verbose, TEXT("URLAgentComponent (%s): Action would be applied to AssociatedEnvironment if StepAction was called here."), *AgentId.ToString());
+        UERL_URL_LOG("Agent component (%s): Action would be applied to AssociatedEnvironment if StepAction was called here.", *AgentId.ToString());
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("URLAgentComponent (%s): Received action but no AssociatedEnvironment to apply it to."), *AgentId.ToString());
+        UERL_URL_WARNING("Agent component (%s): Received action but no AssociatedEnvironment to apply it to.", *AgentId.ToString());
     }
     // TODO: Expose this via a BlueprintAssignable delegate so Blueprints can react.
     // OnActionReceived.Broadcast(Action);

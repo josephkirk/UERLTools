@@ -1,6 +1,7 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright 2025 NGUYEN PHI HUNG
 
 using UnrealBuildTool;
+using System.IO;
 
 public class UERLTools : ModuleRules
 {
@@ -17,9 +18,14 @@ public class UERLTools : ModuleRules
 		PublicIncludePaths.AddRange(
 			new string[] {
 				// Add rl_tools include path
-				System.IO.Path.Combine(ModuleDirectory, "..", "ThirdParty", "rl_tools", "include")
+				Path.Combine(ModuleDirectory, "..", "ThirdParty", "rl_tools", "include"),
+				// Add our module's public include path
+				Path.Combine(ModuleDirectory, "Public")
 			}
 			);
+
+		// Add our private include path
+		PrivateIncludePaths.Add(Path.Combine(ModuleDirectory, "Private"));
 				
 		
 		PrivateIncludePaths.AddRange(
@@ -35,7 +41,8 @@ public class UERLTools : ModuleRules
 				"Core",
 				"CoreUObject",
 				"Engine",
-				"Projects"
+				"Projects",
+				"DeveloperSettings"
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
