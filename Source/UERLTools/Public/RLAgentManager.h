@@ -123,6 +123,7 @@ class UERLTOOLS_API URLAgentManager : public UObject
 
 public:
 	URLAgentManager();
+	virtual ~URLAgentManager(); // Added destructor as per NeedMerge.md
 
 	// Training configuration
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Training")
@@ -266,8 +267,10 @@ protected:
 
 private:
     // rl_tools instances
-    DEVICE device; // The rl_tools device
-    ENVIRONMENT_ADAPTER_TYPE* EnvironmentAdapterInstance = nullptr;
+    // UEEnvironmentAdapter instance, managed by this class
+	ENVIRONMENT_ADAPTER_TYPE* EnvironmentAdapterInstance;
+
+	DEVICE device; // The rl_tools device
 
 	UPROPERTY()
 	URLEnvironmentComponent* EnvironmentComponent;

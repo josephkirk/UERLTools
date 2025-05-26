@@ -3,6 +3,7 @@
 #include "RLAgentManager.h"
 #include "Engine/World.h"
 #include "HAL/PlatformFilemanager.h"
+#include <exception> // Required for std::exception
 
 URLAgentManager::URLAgentManager()
 {
@@ -14,6 +15,7 @@ URLAgentManager::URLAgentManager()
 	EnvironmentComponent = nullptr;
 	ActorNetwork = nullptr;
 	CriticNetwork = nullptr;
+	EnvironmentAdapterInstance = nullptr;
 
 	// Initialize training status
 	TrainingStatus.bIsTraining = false;
@@ -26,48 +28,69 @@ URLAgentManager::URLAgentManager()
 
 bool URLAgentManager::InitializeAgent(URLEnvironmentComponent* InEnvironmentComponent, const FRLTrainingConfig& InTrainingConfig)
 {
-	if (!InEnvironmentComponent)
-	{
-		UE_LOG(LogTemp, Error, TEXT("URLAgentManager::InitializeAgent() - Environment component is null"));
-		return false;
-	}
+    if (!InEnvironmentComponent)
+    {
+        UE_LOG(LogTemp, Error, TEXT("URLAgentManager::InitializeAgent() - Environment component is null"));
+        return false;
+    }
 
-	if (!ValidateEnvironment())
-	{
-		UE_LOG(LogTemp, Error, TEXT("URLAgentManager::InitializeAgent() - Environment validation failed"));
-		return false;
-	}
+    // Store references early for ValidateEnvironment if it needs them
+    EnvironmentComponent = InEnvironmentComponent; 
+    TrainingConfig = InTrainingConfig;
 
-	// Store references
-	EnvironmentComponent = InEnvironmentComponent;
-	TrainingConfig = InTrainingConfig;
+    if (!ValidateEnvironment()) // ValidateEnvironment might use EnvironmentComponent
+    {
+        UE_LOG(LogTemp, Error, TEXT("URLAgentManager::InitializeAgent() - Environment validation failed"));
+        return false;
+    }
 
-	// Clean up any existing networks
-	CleanupNetworks();
+    CleanupNetworks(); // Call this before new allocations
 
-	try
-	{
-		// Get environment dimensions
-		TI ObservationDim = EnvironmentComponent->GetObservationDim();
-		TI ActionDim = EnvironmentComponent->GetActionDim();
+    try
+    {
+        TI ObservationDim = EnvironmentComponent->GetObservationDim();
+        TI ActionDim = EnvironmentComponent->GetActionDim();
 
-		UE_LOG(LogTemp, Log, TEXT("URLAgentManager::InitializeAgent() - Obs Dim: %d, Action Dim: %d"), ObservationDim, ActionDim);
+        UE_LOG(LogTemp, Log, TEXT("URLAgentManager::InitializeAgent() - Runtime Obs Dim: %d, Action Dim: %d"), ObservationDim, ActionDim);
+        UE_LOG(LogTemp, Log, TEXT("URLAgentManager::InitializeAgent() - Spec    Obs Dim: %d, Action Dim: %d"), UERLAgentEnvironmentSpec::OBSERVATION_DIM, UERLAgentEnvironmentSpec::ACTION_DIM);
 
-		// Note: For now, we'll create a simplified initialization
-		// Full rl_tools network creation would require more complex template instantiation
-		// This is a placeholder for the actual network initialization
+        if (ObservationDim != UERLAgentEnvironmentSpec::OBSERVATION_DIM || ActionDim != UERLAgentEnvironmentSpec::ACTION_DIM)
+        {
+            UE_LOG(LogTemp, Error, TEXT("URLAgentManager::InitializeAgent() - Environment dimensions (Obs: %d, Act: %d) do not match UERLAgentEnvironmentSpec dimensions (Obs: %d, Act: %d). Please update UERLAgentEnvironmentSpec in RLAgentManager.h or check environment component configuration."),
+                ObservationDim, ActionDim, UERLAgentEnvironmentSpec::OBSERVATION_DIM, UERLAgentEnvironmentSpec::ACTION_DIM);
+            return false;
+        }
 
-		bIsInitialized = true;
-		UE_LOG(LogTemp, Log, TEXT("URLAgentManager::InitializeAgent() - Agent initialized successfully"));
-		return true;
-	}
-	catch (...)
-	{
-		UE_LOG(LogTemp, Error, TEXT("URLAgentManager::InitializeAgent() - Exception during initialization"));
-		CleanupNetworks();
-		bIsInitialized = false;
-		return false;
-	}
+        EnvironmentAdapterInstance = new ENVIRONMENT_ADAPTER_TYPE(device, EnvironmentComponent, TrainingConfig.ObservationNormalizationParams, TrainingConfig.ActionNormalizationParams);
+        UE_LOG(LogTemp, Log, TEXT("URLAgentManager::InitializeAgent() - UEEnvironmentAdapter instantiated successfully."));
+
+        // ... (placeholder for actual network initialization) ...
+        // For example, if ActorNetwork and CriticNetwork were to be initialized here:
+        // ActorNetwork = new ActorNetworkType();
+        // CriticNetwork = new CriticNetworkType();
+        // rlt::malloc(device, *ActorNetwork);
+        // rlt::malloc(device, *CriticNetwork);
+        // rlt::init_weights(device, *ActorNetwork, device.random_float_cpu);
+        // rlt::init_weights(device, *CriticNetwork, device.random_float_cpu);
+
+        bIsInitialized = true;
+        UE_LOG(LogTemp, Log, TEXT("URLAgentManager::InitializeAgent() - Agent initialized successfully"));
+        return true;
+    }
+    catch (const std::exception& e)
+    {
+        UE_LOG(LogTemp, Error, TEXT("URLAgentManager::InitializeAgent() - Standard exception during initialization: %s"), ANSI_TO_TCHAR(e.what()));
+        CleanupNetworks();
+        bIsInitialized = false;
+        return false;
+    }
+    catch (...)
+    {
+        UE_LOG(LogTemp, Error, TEXT("URLAgentManager::InitializeAgent() - Unknown exception during initialization"));
+        CleanupNetworks();
+        bIsInitialized = false;
+        return false;
+    }
 }
 
 bool URLAgentManager::StartTraining()
@@ -259,24 +282,49 @@ bool URLAgentManager::ValidateEnvironment() const
 		return false;
 	}
 
-	return true;
 }
 
 void URLAgentManager::CleanupNetworks()
 {
-	// Cleanup will be implemented when we have actual network allocation
-	ActorNetwork = nullptr;
-	CriticNetwork = nullptr;
+    UE_LOG(LogTemp, Log, TEXT("URLAgentManager::CleanupNetworks() - Cleaning up networks and adapter..."));
+
+    if (EnvironmentAdapterInstance)
+    {
+        delete EnvironmentAdapterInstance;
+        EnvironmentAdapterInstance = nullptr;
+        UE_LOG(LogTemp, Log, TEXT("URLAgentManager::CleanupNetworks() - UEEnvironmentAdapter cleaned up."));
+    }
+
+    // ... (cleanup for ActorNetwork, CriticNetwork, etc.) ...
+    // Example:
+    // if (ActorNetwork) {
+    //     rlt::free(device, *ActorNetwork);
+    //     delete ActorNetwork;
+    //     ActorNetwork = nullptr;
+    // }
+    // if (CriticNetwork) {
+    //     rlt::free(device, *CriticNetwork);
+    //     delete CriticNetwork;
+    //     CriticNetwork = nullptr;
+    // }
+    UE_LOG(LogTemp, Log, TEXT("URLAgentManager::CleanupNetworks() - Placeholder for Actor/Critic network cleanup."));
+}
+
+URLAgentManager::~URLAgentManager()
+{
+    CleanupNetworks();
+    UE_LOG(LogTemp, Log, TEXT("URLAgentManager destroyed."));
 }
 
 bool URLAgentManager::PerformTrainingStep()
 {
-	// Get action from current policy
-	CurrentAction = GetAction(CurrentObservation);
+    // Get action from current policy
+    CurrentAction = GetAction(CurrentObservation);
 
-	// Step environment
-	EnvironmentComponent->Step(CurrentAction);
+    // Step environment
+    EnvironmentComponent->Step(CurrentAction);
 
+    // ... (existing code)
 	// Get next observation and reward
 	TArray<float> NextObservation = EnvironmentComponent->GetObservation();
 	float Reward = EnvironmentComponent->CalculateReward();
