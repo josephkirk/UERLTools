@@ -53,8 +53,11 @@ This document outlines the tasks required to create an Unreal Engine plugin that
 ## Phase 3: Blueprint Exposure Layer
 
 -   [ ] **3.1. Expand Blueprint Function Library (Medium Priority)**
-    -   [ ] Develop/Expand `URLToolsBlueprintFunctionLibrary` for common RL-related utilities accessible from Blueprints.
-        -   [ ] Expose high-level data conversion utilities (wrapping functionalities from 2.1.3) for Blueprint use (e.g., `ConvertObservationToRLMatrix`, `ConvertRLActionToUEFormat`).
+    -   [ ] Implement actual data marshalling and conversion logic for rl_tools matrices in Blueprint nodes (currently stubs).
+    -   [ ] Expose opaque handles or serialization for rl_tools matrices for Blueprint use.
+    -   [ ] Expand `URLToolsBlueprintFunctionLibrary` for common RL-related utilities accessible from Blueprints.
+        -   [ ] Expose high-level data conversion utilities (wrapping functionalities from 2.1.3) for Blueprint
+    -   [ ] Add error/status reporting to Blueprint nodes. use (e.g., `ConvertObservationToRLMatrix`, `ConvertRLActionToUEFormat`).
         -   [ ] Expose normalization/denormalization utilities for Blueprint users if direct manipulation/configuration is needed (alternative to purely config-driven normalization).
         -   [ ] Provide Blueprint-callable functions for debugging and visualizing RL data (e.g., printing `rl_tools::Matrix` content, checking dimensions).
         -   [ ] Add utilities for creating/validating `FRLTrainingConfig` and `FRLEnvironmentConfig` USTRUCTs from Blueprints.
@@ -97,10 +100,13 @@ This document outlines the tasks required to create an Unreal Engine plugin that
 ## Phase 4: Training Workflow Implementation
 
 -   [ ] **4.1. Implement Asynchronous Training Loop (Critical Priority)**
-    -   [ ] Implement the main training loop(s) within `URLAgentManagerSubsystem` using asynchronous mechanisms (`FAsyncTask` with a custom task class, or `FTSTicker` for periodic updates).
+    -   [ ] Complete thread safety and robust error propagation in async training code (`RLAsyncTrainingTask`).
+    -   [ ] Integrate async training with `URLAgentManagerSubsystem` and Blueprint events.
+    -   [ ] Implement the main training loop(s) using asynchronous mechanisms (`FAsyncTask` with a custom task class, or `FTSTicker` for periodic updates).
     -   [ ] Ensure the loop correctly interfaces with the environment adapter (2.1.2) for environment interaction (reset, step, observe) and `rl_tools` training algorithms/components (actor_critic, replay buffer, optimizer updates).
     -   [ ] Trigger Blueprint events (3.4.2) for progress, completion, and other significant training events.
     -   [ ] Implement robust thread safety for any data shared between the game thread (e.g., for observation gathering if environment runs on game thread) and the training thread. Use UE's synchronization primitives (Mutexes, Critical Sections, Atomic variables).
+    -   [ ] Add robust status/progress reporting and error handling for async tasks.
 -   [ ] **4.2. Replay Buffer Management (for Off-Policy Algorithms)**
     -   [ ] 4.2.1. Expose replay buffer capacity and other relevant configurations (e.g., batch size) in `FRLTrainingConfig`.
     -   [ ] 4.2.2. Potentially visualize replay buffer status (current size, total samples collected) via `GetAgentTrainingStatus` or dedicated Blueprint functions/events.
@@ -137,16 +143,23 @@ This document outlines the tasks required to create an Unreal Engine plugin that
     -   [ ] Implement an internal registry within the subsystem (e.g., `TMap<FName, FRLAgentContext>`) to store state, policy, configs, etc., for each agent.
     -   [ ] Most Blueprint functions in the subsystem (e.g., `ConfigureAgent`, `StartTraining`, `GetAction`) should take an `FName AgentName` parameter.
 -   [ ] **6.2. Device Support Extension (CPU/GPU Flexibility)**
+    -   [ ] Refactor all core code to support device abstraction (currently hardcoded for CPU).
     -   [ ] Template key C++ functions (e.g., in conversion utilities (2.1.3), environment adapter (2.1.2), core `rl_tools` interactions within the subsystem) on `rl_tools` device types (e.g., `rlt::devices::DefaultCPU`, `rlt::devices::DefaultGPU`).
     -   [ ] Design data structures and workflows to be adaptable for future GPU support with minimal code duplication. This involves using `rl_tools` device objects appropriately.
     -   [ ] Add configuration options (e.g., in `FRLTrainingConfig`) to select the computation device (CPU/GPU) where applicable, once `rl_tools` GPU operations are integrated.
 -   [ ] **6.3. Parameter Tuning Utilities**
     -   [ ] Allow dynamic adjustment of some training parameters (e.g., learning rate, discount factor, exploration parameters) from Blueprints or via UE console commands for easier experimentation and tuning, if feasible with `rl_tools` architecture.
--   [ ] **6.4. Error Handling and Reporting**
-    -   [ ] Implement robust error checking and reporting throughout the plugin.
-    -   [ ] Use `UE_LOG` for detailed C++ errors and warnings.
+-   [ ] **6.4. Error Handling, Logging, and Validation**
+    -   [ ] Add robust error handling, logging, and validation throughout the plugin, especially for Blueprint-exposed APIs and async code.
+    -   [ ] Ensure all async and Blueprint-exposed functions propagate errors and status codes.
     -   [ ] Propagate user-friendly error messages or status codes to Blueprint operations (e.g., return values, output pins on BP nodes, specific error events).
     -   [ ] Handle potential exceptions or error codes from `rl_tools` operations gracefully.
+-   [ ] **6.5. Memory Management and Cleanup**
+    -   [ ] Ensure proper memory management for all dynamically allocated resources (e.g., `rl_tools` matrices, UE objects).
+    -   [ ] Implement cleanup logic for all resources in `URLAgentManagerSubsystem` and other components.
+-   [ ] **6.6. Test Coverage**
+    -   [ ] Expand test coverage: add unit and integration tests for data conversion, environment interaction, agent lifecycle, and Blueprint nodes.
+    -   [ ] Add tests for error handling and async task edge cases.
 
 ## Phase 7: Documentation and Examples
 
