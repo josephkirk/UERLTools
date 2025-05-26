@@ -58,7 +58,7 @@ This document outlines the tasks required to create an Unreal Engine plugin that
         -   [X] Functions to manually trigger environment reset, step (for debugging/custom loops).
     -   [ ] 3.3.2. In `URLAgentManagerSubsystem`: (**Note:** Aim for a high-level, task-oriented API. Declarations exist, but C++ implementations are mostly placeholders - See `NEEDFIX.md`)
         -   [ ] **Initialization & Configuration**:
-            -   [ ] `ConfigureAgent(FName AgentName, URLEnvironmentComponent* EnvironmentComponent, FRLTrainingConfig TrainingConfig)` (C++ Placeholder)
+            -   [P] `ConfigureAgent(FName AgentName, URLEnvironmentComponent* EnvironmentComponent, FRLTrainingConfig TrainingConfig)` (Structural C++ implementation for rl_tools component setup in place with detailed TODOs; actual `rl_tools` type selection and init calls still pending within the function)
             -   [ ] `LoadPolicy(FName AgentName, FString FilePath)` (C++ Placeholder)
         -   [ ] **Training (Asynchronous)**:
             -   [ ] `StartTraining(FName AgentName)` / `ResumeTraining(FName AgentName)` (C++ Placeholder, see 3.4, 4.1)
