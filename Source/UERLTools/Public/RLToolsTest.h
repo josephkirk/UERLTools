@@ -8,6 +8,9 @@
 THIRD_PARTY_INCLUDES_START
 #include "rl_tools/operations/cpu_mux.h"
 #include "rl_tools/devices/cpu.h"
+#include "rl_tools/nn/layers/dense/layer.h"
+#include "rl_tools/nn_models/mlp/network.h"
+#include "rl_tools/nn/optimizers/adam/adam.h"
 THIRD_PARTY_INCLUDES_END
 
 #include "RLToolsTest.generated.h"
@@ -18,16 +21,22 @@ THIRD_PARTY_INCLUDES_END
 UCLASS(BlueprintType, Blueprintable)
 class UERLTOOLS_API URLToolsTest : public UObject
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	URLToolsTest();
+    URLToolsTest();
 
-	// Test function to verify rl_tools is working
-	UFUNCTION(BlueprintCallable, Category = "RLTools Test")
-	bool TestRLToolsIntegration();
+    // Test function to verify rl_tools is working
+    UFUNCTION(BlueprintCallable, Category = "RLTools Test")
+    bool TestRLToolsIntegration();
 
 private:
-	// rl_tools device instance
-	rlt::devices::DefaultCPU device;
+    // rl_tools device instance
+    rlt::devices::DefaultCPU device;
+    
+    // Individual test cases
+    bool TestMatrixOperations();
+    bool TestNeuralNetworkLayer();
+    bool TestMLPNetwork();
+    bool TestOptimizer();
 };
