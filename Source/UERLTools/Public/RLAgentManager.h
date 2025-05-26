@@ -6,6 +6,8 @@
 #include "UObject/NoExportTypes.h"
 #include "Engine/Engine.h"
 #include "RLEnvironmentComponent.h"
+#include "RLConfigTypes.h" // Added for FRLNormalizationParams
+#include "UEEnvironmentAdapter.h" // Added for UEEnvironmentAdapter
 
 THIRD_PARTY_INCLUDES_START
 #include "rl_tools/operations/cpu_mux.h"
@@ -64,6 +66,12 @@ struct UERLTOOLS_API FRLTrainingConfig
 	// Steps to collect before starting training
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Training")
 	int32 WarmupSteps = 10000;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Training|Normalization")
+	FRLNormalizationParams ObservationNormalizationParams;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Training|Normalization")
+	FRLNormalizationParams ActionNormalizationParams;
 
 	FRLTrainingConfig()
 	{
@@ -183,6 +191,37 @@ protected:
 	using DEVICE = rlt::devices::DefaultCPU;
 	using T = float;
 	using TI = typename DEVICE::index_t;
+
+	// Define Environment Specification for rl_tools types
+	struct UERLAgentEnvironmentSpec {
+		// Inherit T and TI from the outer scope (URLAgentManager protected section)
+
+		// PLACEHOLDER DIMENSIONS: These MUST be validated against the URLEnvironmentComponent instance at runtime.
+		// Adjust these to your most common environment configuration.
+		static constexpr TI OBSERVATION_DIM = 4; // Example placeholder
+		static constexpr TI ACTION_DIM = 2;    // Example placeholder
+
+		struct OBSERVATION_SPEC {
+			using T = UERLAgentEnvironmentSpec::T;
+			using TI = UERLAgentEnvironmentSpec::TI;
+			static constexpr TI DIM = UERLAgentEnvironmentSpec::OBSERVATION_DIM;
+			using SPEC = rlt::matrix::Specification<T, TI, 1, DIM>;
+			template <typename CONFIG> using Matrix = rlt::MatrixStatic<CONFIG>; // Assuming fixed size observations
+		};
+		struct ACTION_SPEC {
+			using T = UERLAgentEnvironmentSpec::T;
+			using TI = UERLAgentEnvironmentSpec::TI;
+			static constexpr TI DIM = UERLAgentEnvironmentSpec::ACTION_DIM;
+			using SPEC = rlt::matrix::Specification<T, TI, 1, DIM>;
+			template <typename CONFIG> using Matrix = rlt::MatrixStatic<CONFIG>; // Assuming fixed size actions
+		};
+		// Note: The UEEnvironmentAdapter itself defines its State struct internally.
+		// This UERLAgentEnvironmentSpec is primarily for configuring other rl_tools components
+		// that depend on environment properties like dimensions.
+	};
+
+	// rl_tools types and constants (continuation)
+	// T and TI are already defined above, no need to repeat here.
 	
 	// Network architecture constants
 	static constexpr TI HIDDEN_DIM = 64;
@@ -190,20 +229,46 @@ protected:
 	static constexpr auto ACTIVATION_FUNCTION = rlt::nn::activation_functions::ActivationFunction::RELU;
 
 	// Actor network type
-	using ACTOR_STRUCTURE_SPEC = rlt::nn_models::mlp::StructureSpecification<T, TI, HIDDEN_DIM, NUM_LAYERS, ACTIVATION_FUNCTION>;
+	// These specs depend on the environment's observation and action dimensions for input/output layers.
+	// However, rl_tools MLP structures are often defined by hidden layers, input/output are inferred or set at instantiation.
+	// For now, let's assume these are generic MLP structures.
+	using ACTOR_STRUCTURE_SPEC = rlt::nn_models::mlp::StructureSpecification<T, TI, UERLAgentEnvironmentSpec::OBSERVATION_DIM, UERLAgentEnvironmentSpec::ACTION_DIM, HIDDEN_DIM, NUM_LAYERS, ACTIVATION_FUNCTION, rlt::nn::activation_functions::TANH>; // Actor output usually tanh
 	using ACTOR_SPEC = rlt::nn_models::mlp::AdamSpecification<ACTOR_STRUCTURE_SPEC>;
 	using ACTOR_TYPE = rlt::nn_models::mlp::NeuralNetworkAdam<ACTOR_SPEC>;
 
-	// Critic network type
-	using CRITIC_STRUCTURE_SPEC = rlt::nn_models::mlp::StructureSpecification<T, TI, HIDDEN_DIM, NUM_LAYERS, ACTIVATION_FUNCTION>;
+	// Critic network type (takes observation and action as input)
+	// The input dimension for the critic is ObservationDim + ActionDim.
+	// We'll need a custom StructureSpecification or handle this during instantiation if rl_tools doesn't directly support it in the generic MLP spec.
+	// For simplicity, we'll assume a critic structure that can be configured or adapted.
+	// This might require a more specific critic network structure definition later.
+	using CRITIC_STRUCTURE_SPEC = rlt::nn_models::mlp::StructureSpecification<T, TI, UERLAgentEnvironmentSpec::OBSERVATION_DIM + UERLAgentEnvironmentSpec::ACTION_DIM, 1, HIDDEN_DIM, NUM_LAYERS, ACTIVATION_FUNCTION, rlt::nn::activation_functions::IDENTITY>; // Critic output is Q-value
 	using CRITIC_SPEC = rlt::nn_models::mlp::AdamSpecification<CRITIC_STRUCTURE_SPEC>;
 	using CRITIC_TYPE = rlt::nn_models::mlp::NeuralNetworkAdam<CRITIC_SPEC>;
 
-private:
-	// rl_tools device
-	DEVICE Device;
+	// TD3 Parameters
+	using TD3_PARAMETERS = rlt::rl::algorithms::td3::Parameters<T, TI>;
 
-	// Environment reference
+	// Actor-Critic type
+	using ACTOR_CRITIC_SPEC = rlt::rl::algorithms::td3::Specification<T, TI, UERLAgentEnvironmentSpec, ACTOR_TYPE, CRITIC_TYPE, TD3_PARAMETERS>;
+	using ACTOR_CRITIC_TYPE = rlt::rl::algorithms::td3::ActorCritic<ACTOR_CRITIC_SPEC>;
+
+	// Replay Buffer
+	static constexpr TI REPLAY_BUFFER_CAPACITY = 100000; // Example capacity
+	using REPLAY_BUFFER_SPEC = rlt::rl::components::replay_buffer::Specification<T, TI, UERLAgentEnvironmentSpec::OBSERVATION_DIM, UERLAgentEnvironmentSpec::ACTION_DIM, REPLAY_BUFFER_CAPACITY>;
+	using REPLAY_BUFFER_TYPE = rlt::rl::components::ReplayBuffer<REPLAY_BUFFER_SPEC>;
+
+	// Off-Policy Runner
+	// The OffPolicyRunner needs the actual UEEnvironmentAdapter type, not just its spec.
+	// Let's define the adapter type first.
+	using ENVIRONMENT_ADAPTER_TYPE = UEEnvironmentAdapter<DEVICE, UERLAgentEnvironmentSpec>;
+	using OFF_POLICY_RUNNER_SPEC = rlt::rl::components::off_policy_runner::Specification<T, TI, ENVIRONMENT_ADAPTER_TYPE, REPLAY_BUFFER_TYPE::CAPACITY, typename ACTOR_CRITIC_TYPE::ParametersType::OFF_POLICY_RUNNER_PARAMETERS_TYPE>;
+    using OFF_POLICY_RUNNER_TYPE = rlt::rl::components::OffPolicyRunner<OFF_POLICY_RUNNER_SPEC>;
+
+private:
+    // rl_tools instances
+    DEVICE device; // The rl_tools device
+    ENVIRONMENT_ADAPTER_TYPE* EnvironmentAdapterInstance = nullptr;
+
 	UPROPERTY()
 	URLEnvironmentComponent* EnvironmentComponent;
 

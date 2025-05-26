@@ -9,22 +9,21 @@ This document outlines the tasks required to create an Unreal Engine plugin that
     -   [X] 1.1.2. Define plugin structure (Source, Resources, etc.).
 -   [X] **1.2. Integrate `rl_tools` Library**
     -   [X] 1.2.1. Clone/copy `rl_tools` repository into `UERLTools/Source/ThirdParty/rl_tools/`. (Path corrected)
-    -   [X] 1.2.2. Ensure only necessary components (primarily the `include` directory from `rl_tools/src` for the header-only core) are included to keep the plugin lean.
-    -   [X] 1.2.3. Configure `UERLTools.Build.cs`:
+    -   [X] 1.2.2. Ensure only necessary components (primarily the `include` directory from `rl_tools/src` for the header-only core) are included to keep the plugin lean.                                                                                                                         -   [X] 1.2.3. Configure `UERLTools.Build.cs`:
         -   [X] Add `rl_tools/include` to `PublicIncludePaths`. (Path corrected from `rl_tools_lib/include`)
         -   [X] Set `CppStandard = CppStandardVersion.Cpp17`.
         -   [X] Add any necessary `PublicDefinitions` if required by `rl_tools`. (Assumed done/not needed if not specified as missing)
         -   [X] Handle potential compiler warnings (e.g., consider `bEnableUndefinedIdentifierWarnings = false;` cautiously, or use `THIRD_PARTY_INCLUDES_START/END`). (Confirmed done)
 -   [X] **1.3. Initial Compilation and Verification**
     -   [X] 1.3.1. Create a test C++ class within the plugin (`RLToolsTest`).
-    -   [X] 1.3.2. Include core `rl_tools` headers (e.g., `<rl_tools/operations/cpu_mux.h>`, `<rl_tools/devices/cpu.h>`).
+    -   [X] 1.3.2. Include core `rl_tools` headers (e.g., `<rl_tools/operatio  ns/cpu_mux.h>`, `<rl_tools/devices/cpu.h>`).
     -   [X] 1.3.3. Instantiate basic `rl_tools` types (e.g., `rlt::devices::DefaultCPU`).
     -   [X] 1.3.4. Compile the UE project to ensure `rl_tools` is recognized and builds correctly.
     -   [X] 1.3.5. Address any compilation errors or warnings, potentially by wrapping includes with `THIRD_PARTY_INCLUDES_START`/`THIRD_PARTY_INCLUDES_END` and specific warning pragmas. (Covered by 1.2.3)
 
 ## Phase 2: C++ Abstraction Layer for RLtools in UE
 
--   [ ] **2.1. Define Core RL Structures and Types (Incorporating `Thoughts.md` & `claude_thought.md`)**
+-   [ ] **2.1. Define Core RL Structures and Types **
     -   [ ] **2.1.1. Implement `URLAgentManagerSubsystem` (Higher Priority)**
         -   [ ] Inherit from `UGameInstanceSubsystem` (or `UWorldSubsystem` if per-level agent lifecycle is strictly needed, but `UGameInstanceSubsystem` is generally preferred for global managers).
         -   [ ] This subsystem will be the central point for managing RL agent lifecycles, policies, training, and inference processes.
@@ -32,15 +31,15 @@ This document outlines the tasks required to create an Unreal Engine plugin that
             -   [ ] Manage `rl_tools` resource allocation (e.g., using `rlt::malloc`) in `Initialize()` or specific agent creation methods.
             -   [ ] Ensure proper deallocation of `rl_tools` resources (e.g., using `rlt::free`) in `Deinitialize()` or agent destruction methods. (**Critical Priority for memory safety**)
         -   [ ] Ensure subsystem is easily accessible from both C++ (e.g., `GetGameInstance()->GetSubsystem<URLAgentManagerSubsystem>()`) and Blueprints.
-    -   [ ] **2.1.2. Implement Environment Adapter (Critical Priority)**
-        -   [ ] Create a templated C++ adapter class/struct (e.g., `UEEnvironmentAdapter<SPEC>`) to bridge `URLEnvironmentComponent` (or other UE environment representations) with the C++ API expected by `rl_tools`.
-        -   [ ] The adapter should implement the necessary static or member functions like `rlt::init`, `rlt::initial_state`, `rlt::step`, `rlt::observe`, `rlt::reward`, and `rlt::terminated`.
-        -   [ ] Design the adapter to be flexible, allowing for different UE environment sources and efficient data exchange (e.g., minimizing data copies).
-        -   [ ] Encapsulate environment-specific logic within the adapter, separating it from the core RL agent logic in the subsystem.
-    -   [ ] **2.1.3. Develop Core C++ Data Conversion & Normalization Utilities (Critical Priority)**
-        -   [ ] Create a dedicated C++ utility module/namespace (e.g., `RLToolsConversionUtils`) or static methods within the subsystem for robust and efficient data conversions.
-        -   [ ] Implement functions to convert between UE types (`TArray<float>`, `FVector`, `FRotator`, custom `USTRUCT`s for observations/actions) and `rl_tools::Matrix` or other tensor types.
-        -   [ ] Implement configurable normalization/denormalization logic for observation and action data within these C++ conversion utilities (see 3.5.2.1 for config).
+    -   [X] **2.1.2. Implement Environment Adapter (Critical Priority)**
+        -   [X] Create a templated C++ adapter class/struct (e.g., `UEEnvironmentAdapter<SPEC>`) to bridge `URLEnvironmentComponent` (or other UE environment representations) with the C++ API expected by `rl_tools`.
+        -   [X] The adapter should implement the necessary static or member functions like `rlt::init`, `rlt::initial_state`, `rlt::step`, `rlt::observe`, `rlt::reward`, and `rlt::terminated`.
+        -   [X] Design the adapter to be flexible, allowing for different UE environment sources and efficient data exchange (e.g., minimizing data copies).
+        -   [X] Encapsulate environment-specific logic within the adapter, separating it from the core RL agent logic in the subsystem.
+    -   [X] **2.1.3. Develop Core C++ Data Conversion & Normalization Utilities (Critical Priority)**
+        -   [X] Create a dedicated C++ utility module/namespace (e.g., `RLToolsConversionUtils`) or static methods within the subsystem for robust and efficient data conversions.
+        -   [X] Implement functions to convert between UE types (`TArray<float>`, `FVector`, `FRotator`, custom `USTRUCT`s for observations/actions) and `rl_tools::Matrix` or other tensor types.
+        -   [X] Implement configurable normalization/denormalization logic for observation and action data within these C++ conversion utilities (see 3.5.2.1 for config).
 
 ## Phase 3: Blueprint Exposure Layer
 
@@ -156,6 +155,3 @@ This document outlines the tasks required to create an Unreal Engine plugin that
     -   [ ] 7.3.1. Ensure all C++ classes, functions, and Blueprint-exposed elements are well-commented (using Unreal's documentation comment standards).
     -   [ ] 7.3.2. Consider generating API documentation (e.g., using Doxygen or Unreal's built-in tools if applicable) for C++ developers.
 
----
-
-These updates align with the strategic recommendations in `Thoughts.md` and `claude_thought.md`, focusing on robust architecture, efficient data handling, and extensibility for future growth. By following this refined roadmap, the RLtools-UE integration will be more maintainable and scalable, meeting both current and future needs.

@@ -4,6 +4,151 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Engine/Engine.h" // Keep for GEngine access if needed by BPIEs
+
+THIRD_PARTY_INCLUDES_START
+// #include "rl_tools/operations/cpu_mux.h" // Not strictly needed in this header if Device is private
+// #include "rl_tools/devices/cpu.h"       // Not strictly needed in this header if Device is private
+THIRD_PARTY_INCLUDES_END
+
+#include "RLEnvironmentComponent.generated.h"
+
+// Forward declarations
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEnvironmentResetComplete, const TArray<float>&, InitialObservation);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FOnEnvironmentStepComplete, const TArray<float>&, NextObservation, float, Reward, bool, bIsTerminated, bool, bIsTruncated);
+
+/**
+ * Configuration structure for RL environment
+ */
+USTRUCT(BlueprintType)
+struct UERLTOOLS_API FRLEnvironmentConfig
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Environment Config")
+	int32 ObservationDim = 4;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Environment Config")
+	int32 ActionDim = 2;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Environment Config")
+	int32 MaxEpisodeLength = 1000;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Environment Config")
+	bool bContinuousActions = true;
+
+	FRLEnvironmentConfig() = default; // Use default constructor
+};
+
+/**
+ * Base environment component that acts as a bridge between UE and rl_tools
+ * This component should be inherited and customized for specific RL tasks
+ */
+UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), BlueprintType, Blueprintable)
+class UERLTOOLS_API URLEnvironmentComponent : public UActorComponent
+{
+	GENERATED_BODY()
+
+public:	
+	URLEnvironmentComponent();
+
+protected:
+	virtual void BeginPlay() override;
+
+public:	
+	// Removed TickComponent as base functionality doesn't require it; derived classes can add it.
+
+	// Environment configuration
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Environment")
+	FRLEnvironmentConfig EnvironmentConfig;
+
+	// Current episode step count
+	UPROPERTY(BlueprintReadOnly, Category = "Environment State")
+	int32 CurrentEpisodeStep;
+
+	// Whether the environment is currently terminated (final state reached)
+	UPROPERTY(BlueprintReadOnly, Category = "Environment State")
+	bool bIsTerminatedState;
+
+	// Whether the environment is currently truncated (max steps reached or other non-terminal end)
+	UPROPERTY(BlueprintReadOnly, Category = "Environment State")
+	bool bIsTruncatedState;
+
+	// Blueprint Events for external listeners
+	UPROPERTY(BlueprintAssignable, Category = "Environment Events")
+	FOnEnvironmentResetComplete OnEnvironmentResetComplete;
+
+	UPROPERTY(BlueprintAssignable, Category = "Environment Events")
+	FOnEnvironmentStepComplete OnEnvironmentStepComplete;
+
+	// --- Interface for UEEnvironmentAdapter ---
+	UFUNCTION(BlueprintCallable, Category = "Environment|Adapter Interface")
+	virtual void ResetEnvironment();
+
+	UFUNCTION(BlueprintCallable, Category = "Environment|Adapter Interface")
+	virtual void StepAction(const TArray<float>& Action);
+    
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Environment|Adapter Interface")
+	TArray<float> GetCurrentObservation() const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Environment|Adapter Interface")
+	float GetCurrentReward() const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Environment|Adapter Interface")
+	bool IsDone() const;
+    
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Environment|Adapter Interface")
+	int32 GetMaxEpisodeSteps() const;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Environment|Adapter Interface")
+	bool HasMaxEpisodeSteps() const;
+	// --- End Interface for UEEnvironmentAdapter ---
+
+
+	// Utility functions for Blueprint/C++ users
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Environment|Utility")
+	int32 GetObservationDim() const { return EnvironmentConfig.ObservationDim; }
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Environment|Utility")
+	int32 GetActionDim() const { return EnvironmentConfig.ActionDim; }
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Environment|Utility")
+	bool IsContinuousActions() const { return EnvironmentConfig.bContinuousActions; }
+
+
+protected:
+	// Internal state variables
+	TArray<float> CachedObservation;
+	float CachedReward;
+
+	// Core logic to be implemented in Blueprints or derived C++ classes
+	UFUNCTION(BlueprintImplementableEvent, Category = "Environment|Implementable Logic", meta = (DisplayName = "Handle Environment Reset"))
+	TArray<float> BP_HandleReset(); // Returns initial observation
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Environment|Implementable Logic", meta = (DisplayName = "Handle Environment Step"))
+	void BP_HandleStep(const TArray<float>& Action); // User implements action effects here
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Environment|Implementable Logic", meta = (DisplayName = "Calculate Current Observation"))
+	TArray<float> BP_CalculateObservation(); // Returns current observation
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Environment|Implementable Logic", meta = (DisplayName = "Calculate Current Reward"))
+	float BP_CalculateReward(); // Returns current reward
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Environment|Implementable Logic", meta = (DisplayName = "Check If Terminated"))
+	bool BP_CheckTerminated(); // Returns true if episode ended due to terminal state
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Environment|Implementable Logic", meta = (DisplayName = "Check If Truncated"))
+	bool BP_CheckTruncated(); // Returns true if episode ended due to truncation (e.g. max steps)
+
+private:
+	// rl_tools::devices::DefaultCPU Device; // This can be removed if not used directly by this base class
+                                          // and only by rl_tools algorithms via the adapter.
+};
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Components/ActorComponent.h"
 #include "Engine/Engine.h"
 
 THIRD_PARTY_INCLUDES_START
