@@ -7,8 +7,5 @@ UERLTools aims to provide a seamless Unreal Engine plugin that integrates the po
 - Bridges Unreal's environment components with rl_tools via adapters and data conversion utilities.
 - Exposes RL agent management, training, and inference to Blueprints for rapid prototyping and gameplay integration.
 
-**Setup:**
-- Clone the rl_tools repository and place it in `Source/ThirdParty/rl_tools`.
-
 **Status:**
 Work in progress and not ready for production use.
