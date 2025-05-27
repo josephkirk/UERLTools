@@ -53,8 +53,8 @@ This document outlines the tasks required to create an Unreal Engine plugin that
 
 ## Phase 2.3: Code Review and Refinement (Addressing Tech Debt)
 
--   [ ] **2.3.1. Refactor Agent Management Architecture**
-    -   [ ] Refactor `URLAgentManagerSubsystem` to delegate to `URLAgentManager` instances or a non-UObject helper class, per `techdebt.md` (Issue #1).
+-   [x] **2.3.1. Refactor Agent Management Architecture**
+    -   [x] Refactor `URLAgentManagerSubsystem` to delegate to `URLAgentManager` instances or a non-UObject helper class, per `techdebt.md` (Issue #1).
 -   [ ] **2.3.2. Consolidate Configuration Structures**
     -   [ ] Consolidate `FLocalRLTrainingConfig` and `FRLTrainingConfig` into a single `FRLTrainingConfig`, per `techdebt.md` (Issue #2).
 -   [ ] **2.3.3. Refactor Training Status Representation**
