@@ -7,126 +7,7 @@
 
 URLEnvironmentComponent::URLEnvironmentComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false; // Base class doesn't tick by default. Derived classes can enable if needed.
-	CurrentEpisodeStep = 0;
-	bIsTerminatedState = false;
-	bIsTruncatedState = false;
-	CachedReward = 0.0f;
-	// EnvironmentConfig will be default initialized by its own constructor
-}
-
-void URLEnvironmentComponent::BeginPlay()
-{
-	Super::BeginPlay();
-	// It's generally better to require an explicit ResetEnvironment call to start an episode,
-	// rather than auto-resetting on BeginPlay, to give more control to the user/system.
-	// If an auto-reset is desired, the user can call ResetEnvironment() in their BeginPlay override
-	// or via an initial setup Blueprint.
-}
-
-void URLEnvironmentComponent::ResetEnvironment()
-{
-	CurrentEpisodeStep = 0;
-	bIsTerminatedState = false;
-	bIsTruncatedState = false;
-	CachedReward = 0.0f; // Reward is typically for (s,a,s'), so initial reward is often 0.
-
-	// Call Blueprint/derived C++ logic to get initial observation
-	CachedObservation = BP_HandleReset(); 
-    
-    // Validate observation dimension
-    if (CachedObservation.Num() != EnvironmentConfig.ObservationDim)
-    {
-        UERL_WARNING( TEXT("URLEnvironmentComponent::ResetEnvironment - Observation dimension mismatch. Expected %d, Got %d from BP_HandleReset. Resizing and padding/truncating."), EnvironmentConfig.ObservationDim, CachedObservation.Num());
-        CachedObservation.SetNumZeroed(EnvironmentConfig.ObservationDim); // Ensures correct size
-    }
-
-	OnEnvironmentResetComplete.Broadcast(CachedObservation);
-}
-
-void URLEnvironmentComponent::StepAction(const TArray<float>& Action)
-{
-    if (IsDone())
-    {
-        UERL_WARNING( TEXT("URLEnvironmentComponent::StepAction called on a finished episode (Terminated: %s, Truncated: %s). Please ResetEnvironment first."), bIsTerminatedState ? TEXT("True") : TEXT("False"), bIsTruncatedState ? TEXT("True") : TEXT("False"));
-        // Broadcast current (terminal) state again or do nothing to prevent further state changes.
-        OnEnvironmentStepComplete.Broadcast(CachedObservation, CachedReward, bIsTerminatedState, bIsTruncatedState);
-        return;
-    }
-
-    // Validate action dimension for continuous actions
-    if (EnvironmentConfig.bContinuousActions && Action.Num() != EnvironmentConfig.ActionDim)
-    {
-        UERL_ERROR( TEXT("URLEnvironmentComponent::StepAction - Action dimension mismatch for continuous actions. Expected %d, Got %d. Action will be ignored or may cause errors in BP_HandleStep."), EnvironmentConfig.ActionDim, Action.Num());
-        // Potentially return or use a default/empty action to prevent BP errors with wrong action size.
-        // For now, proceeding, but this is a risky state.
-    }
-    
-    // Call Blueprint/derived C++ logic to apply action and update environment
-	BP_HandleStep(Action);
-
-	CurrentEpisodeStep++;
-
-	// Update internal state by calling Blueprint/derived C++ getters
-	CachedObservation = BP_CalculateObservation();
-	CachedReward = BP_CalculateReward();
-	bIsTerminatedState = BP_CheckTerminated();
-	
-	// Check for truncation due to max steps *before* custom truncation logic
-    // to ensure max steps is always honored if MaxEpisodeLength > 0.
-	bool bMaxStepsReached = (EnvironmentConfig.MaxEpisodeLength > 0 && CurrentEpisodeStep >= EnvironmentConfig.MaxEpisodeLength);
-	bIsTruncatedState = BP_CheckTruncated() || bMaxStepsReached; 
-
-    // Standard practice: if an environment is terminated, it cannot also be truncated by other means 
-    // (unless termination and max_steps truncation happen on the exact same step).
-    // If it's a true terminal state, truncation flags (other than max_steps) are often cleared.
-    if (bIsTerminatedState && !bMaxStepsReached) {
-        bIsTruncatedState = false; // True termination overrides other truncation reasons.
-    }
-    
-    // Validate observation dimension after step
-    if (CachedObservation.Num() != EnvironmentConfig.ObservationDim)
-    {
-        UERL_WARNING( TEXT("URLEnvironmentComponent::StepAction - Observation dimension mismatch after step. Expected %d, Got %d from BP_CalculateObservation. Resizing and padding/truncating."), EnvironmentConfig.ObservationDim, CachedObservation.Num());
-        CachedObservation.SetNumZeroed(EnvironmentConfig.ObservationDim); // Ensures correct size
-    }
-
-	OnEnvironmentStepComplete.Broadcast(CachedObservation, CachedReward, bIsTerminatedState, bIsTruncatedState);
-}
-
-TArray<float> URLEnvironmentComponent::GetCurrentObservation() const
-{
-	return CachedObservation;
-}
-
-float URLEnvironmentComponent::GetCurrentReward() const
-{
-	return CachedReward;
-}
-
-bool URLEnvironmentComponent::IsDone() const
-{
-	return bIsTerminatedState || bIsTruncatedState;
-}
-
-int32 URLEnvironmentComponent::GetMaxEpisodeSteps() const
-{
-	return EnvironmentConfig.MaxEpisodeLength;
-}
-
-bool URLEnvironmentComponent::HasMaxEpisodeSteps() const
-{
-	// MaxEpisodeLength > 0 indicates it's a meaningful limit.
-	// 0 or negative might mean no limit or rely on other termination.
-	return EnvironmentConfig.MaxEpisodeLength > 0;
-}
-
-
-#include "RLEnvironmentComponent.h"
-
-URLEnvironmentComponent::URLEnvironmentComponent()
-{
-	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bCanEverTick = true; // Enable ticking by default
 	
 	// Initialize state
 	CurrentStep = 0;
@@ -150,175 +31,108 @@ void URLEnvironmentComponent::TickComponent(float DeltaTime, ELevelTick TickType
 
 TArray<float> URLEnvironmentComponent::Reset()
 {
-	// Reset environment state
 	CurrentStep = 0;
 	bIsTerminated = false;
 	bIsTruncated = false;
 	LastReward = 0.0f;
 
-	// Get initial observation
-	TArray<float> InitialObservation;
-	
-	// Try Blueprint implementation first
-	if (BP_OnReset.IsBound())
+	// Call Blueprint implementation if available, otherwise use default empty observation
+	if (GetClass()->IsFunctionImplementedInScript(GET_FUNCTION_NAME_CHECKED(URLEnvironmentComponent, BP_OnReset)))
 	{
-		InitialObservation = BP_OnReset();
+		LastObservation = BP_OnReset();
 	}
 	else
 	{
-		// Default implementation - return zeros
-		InitialObservation.Init(0.0f, EnvironmentConfig.ObservationDim);
-		UERL_WARNING( TEXT("URLEnvironmentComponent::Reset() - Using default implementation. Override BP_OnReset for custom behavior."));
+		// Default to zero observation
+		LastObservation.Init(0.0f, EnvironmentConfig.ObservationDim);
 	}
-
-	// Validate observation dimension
-	if (InitialObservation.Num() != EnvironmentConfig.ObservationDim)
-	{
-		UERL_ERROR( TEXT("URLEnvironmentComponent::Reset() - Observation dimension mismatch. Expected: %d, Got: %d"), 
-			EnvironmentConfig.ObservationDim, InitialObservation.Num());
-		InitialObservation.SetNum(EnvironmentConfig.ObservationDim);
-	}
-
-	LastObservation = InitialObservation;
 
 	// Broadcast reset event
-	OnEnvironmentReset.Broadcast(InitialObservation);
+	OnEnvironmentReset.Broadcast(LastObservation);
 
-	return InitialObservation;
+	return LastObservation;
 }
 
 void URLEnvironmentComponent::Step(const TArray<float>& Action)
 {
-	// Validate action dimension
-	if (Action.Num() != EnvironmentConfig.ActionDim)
+	if (bIsTerminated || bIsTruncated)
 	{
-		UERL_ERROR( TEXT("URLEnvironmentComponent::Step() - Action dimension mismatch. Expected: %d, Got: %d"), 
-			EnvironmentConfig.ActionDim, Action.Num());
+		UE_LOG(LogTemp, Warning, TEXT("URLEnvironmentComponent::Step called on a finished episode. Please call Reset() first."));
+		OnEnvironmentStep.Broadcast(LastObservation, LastReward, bIsTerminated, bIsTruncated);
 		return;
 	}
 
-	// Don't step if episode is already finished
-	if (IsEpisodeFinished())
-	{
-		UERL_WARNING( TEXT("URLEnvironmentComponent::Step() - Trying to step finished episode. Call Reset() first."));
-		return;
-	}
-
-	// Increment step counter
-	CurrentStep++;
-
-	// Execute action in environment
-	if (BP_OnStep.IsBound())
+	// Call Blueprint implementation if available
+	if (GetClass()->IsFunctionImplementedInScript(GET_FUNCTION_NAME_CHECKED(URLEnvironmentComponent, BP_OnStep)))
 	{
 		BP_OnStep(Action);
 	}
-	else
-	{
-		UERL_WARNING( TEXT("URLEnvironmentComponent::Step() - Using default implementation. Override BP_OnStep for custom behavior."));
-	}
 
-	// Get next observation
-	TArray<float> NextObservation = GetObservation();
+	// Update step count
+	CurrentStep++;
+
+	// Get new observation
+	LastObservation = GetObservation();
 
 	// Calculate reward
-	float Reward = CalculateReward();
-	LastReward = Reward;
+	LastReward = CalculateReward();
 
 	// Check termination conditions
 	bIsTerminated = CheckTerminated();
-	bIsTruncated = CheckTruncated();
+	bool bMaxStepsReached = (EnvironmentConfig.MaxEpisodeLength > 0 && CurrentStep >= EnvironmentConfig.MaxEpisodeLength);
+	bIsTruncated = CheckTruncated() || bMaxStepsReached;
 
-	// Cache observation
-	LastObservation = NextObservation;
+	// If terminated, don't set truncated unless max steps reached
+	if (bIsTerminated && !bMaxStepsReached)
+	{
+		bIsTruncated = false;
+	}
+
+	// Validate observation dimension
+	if (LastObservation.Num() != EnvironmentConfig.ObservationDim)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("URLEnvironmentComponent::Step - Observation dimension mismatch. Expected %d, Got %d. Resizing and padding/truncating."), 
+			EnvironmentConfig.ObservationDim, LastObservation.Num());
+		LastObservation.SetNumZeroed(EnvironmentConfig.ObservationDim);
+	}
 
 	// Broadcast step event
-	OnEnvironmentStep.Broadcast(NextObservation, Reward, bIsTerminated, bIsTruncated);
+	OnEnvironmentStep.Broadcast(LastObservation, LastReward, bIsTerminated, bIsTruncated);
 }
 
 TArray<float> URLEnvironmentComponent::GetObservation()
 {
-	TArray<float> Observation;
-
-	// Try Blueprint implementation first
-	if (BP_GetObservation.IsBound())
+	if (GetClass()->IsFunctionImplementedInScript(GET_FUNCTION_NAME_CHECKED(URLEnvironmentComponent, BP_GetObservation)))
 	{
-		Observation = BP_GetObservation();
+		return BP_GetObservation();
 	}
-	else
-	{
-		// Default implementation - return cached observation or zeros
-		if (LastObservation.Num() == EnvironmentConfig.ObservationDim)
-		{
-			Observation = LastObservation;
-		}
-		else
-		{
-			Observation.Init(0.0f, EnvironmentConfig.ObservationDim);
-		}
-		UERL_WARNING( TEXT("URLEnvironmentComponent::GetObservation() - Using default implementation. Override BP_GetObservation for custom behavior."));
-	}
-
-	// Validate observation dimension
-	if (Observation.Num() != EnvironmentConfig.ObservationDim)
-	{
-		UERL_ERROR( TEXT("URLEnvironmentComponent::GetObservation() - Observation dimension mismatch. Expected: %d, Got: %d"), 
-			EnvironmentConfig.ObservationDim, Observation.Num());
-		Observation.SetNum(EnvironmentConfig.ObservationDim);
-	}
-
-	return Observation;
+	return LastObservation;
 }
 
 float URLEnvironmentComponent::CalculateReward()
 {
-	float Reward = 0.0f;
-
-	// Try Blueprint implementation first
-	if (BP_CalculateReward.IsBound())
+	if (GetClass()->IsFunctionImplementedInScript(GET_FUNCTION_NAME_CHECKED(URLEnvironmentComponent, BP_CalculateReward)))
 	{
-		Reward = BP_CalculateReward();
+		return BP_CalculateReward();
 	}
-	else
-	{
-		// Default implementation - return 0
-		UERL_WARNING( TEXT("URLEnvironmentComponent::CalculateReward() - Using default implementation. Override BP_CalculateReward for custom behavior."));
-	}
-
-	return Reward;
+	return 0.0f;
 }
 
 bool URLEnvironmentComponent::CheckTerminated()
 {
-	bool bTerminated = false;
-
-	// Try Blueprint implementation first
-	if (BP_CheckTerminated.IsBound())
+	if (GetClass()->IsFunctionImplementedInScript(GET_FUNCTION_NAME_CHECKED(URLEnvironmentComponent, BP_CheckTerminated)))
 	{
-		bTerminated = BP_CheckTerminated();
+		return BP_CheckTerminated();
 	}
-	else
-	{
-		// Default implementation - never terminate
-		UERL_WARNING( TEXT("URLEnvironmentComponent::CheckTerminated() - Using default implementation. Override BP_CheckTerminated for custom behavior."));
-	}
-
-	return bTerminated;
+	return false;
 }
 
 bool URLEnvironmentComponent::CheckTruncated()
 {
-	bool bTruncated = false;
-
-	// Try Blueprint implementation first
-	if (BP_CheckTruncated.IsBound())
+	if (GetClass()->IsFunctionImplementedInScript(GET_FUNCTION_NAME_CHECKED(URLEnvironmentComponent, BP_CheckTruncated)))
 	{
-		bTruncated = BP_CheckTruncated();
+		return BP_CheckTruncated();
 	}
-	else
-	{
-		// Default implementation - check max episode length
-		bTruncated = (CurrentStep >= EnvironmentConfig.MaxEpisodeLength);
-	}
-
-	return bTruncated;
+	return false;
 }
+

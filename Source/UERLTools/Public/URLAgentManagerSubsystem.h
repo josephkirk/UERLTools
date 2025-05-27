@@ -1,15 +1,17 @@
 #pragma once
 
-#include "CoreMinimal.h"
-#include "Subsystems/GameInstanceSubsystem.h"
-#include "URLAgentManagerSubsystem.generated.h"
-
 // Forward declarations
 class URLEnvironmentComponent; // Assuming this is defined in RLEnvironmentComponent.h
 struct FRLTrainingConfig;     // Assuming this USTRUCT is defined, e.g., in RLTypes.h
 THIRD_PARTY_INCLUDES_START
 #include <rl_tools/operations/cpu.h> // For rlt::devices::DefaultCPU, rlt::malloc, rlt::free, rlt::init
 THIRD_PARTY_INCLUDES_END
+
+#include "CoreMinimal.h"
+#include "Subsystems/GameInstanceSubsystem.h"
+#include "URLAgentManagerSubsystem.generated.h"
+
+
 
 // DECLARE_LOG_CATEGORY_EXTERN(LogUERLTools, Log, All); // Defined in UERLToolsLog.h or similar
 

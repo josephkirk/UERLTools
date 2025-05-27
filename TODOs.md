@@ -49,10 +49,29 @@ This document outlines the tasks required to create an Unreal Engine plugin that
         -   [X] Ensure BlueprintImplementableEvents are correctly invoked by C++ wrappers.
         -   [X] Implement dimension validation for observations and actions.
     - [X] 2.2.2 Create URLAgentComponent
+    - [X] **Resolve USTRUCT name collisions** for `FRLEnvironmentConfig` and `FRLTrainingConfig` to ensure proper UHT processing and compilation (Completed 2025-05-27).
+
+## Phase 2.3: Code Review and Refinement (Addressing Tech Debt)
+
+-   [ ] **2.3.1. Refactor Agent Management Architecture**
+    -   [ ] Refactor `URLAgentManagerSubsystem` to delegate to `URLAgentManager` instances or a non-UObject helper class, per `techdebt.md` (Issue #1).
+-   [ ] **2.3.2. Consolidate Configuration Structures**
+    -   [ ] Consolidate `FLocalRLTrainingConfig` and `FRLTrainingConfig` into a single `FRLTrainingConfig`, per `techdebt.md` (Issue #2).
+-   [ ] **2.3.3. Refactor Training Status Representation**
+    -   [ ] Refactor `FRLAgentContext` to use `FRLTrainingStatus` USTRUCT for status tracking, per `techdebt.md` (Issue #3).
+-   [ ] **2.3.4. Clean Up Conversion Utilities**
+    -   [ ] Remove duplicated template functions and `LOG_UERLTOOLS` macro in `RLToolsConversionUtils.cpp`, per `techdebt.md` (Issue #4).
+-   [ ] **2.3.5. Standardize Naming Conventions**
+    -   [ ] Establish and apply consistent naming conventions (RL, URL, UERL) throughout the plugin, per `techdebt.md` (Issue #6).
+
 
 ## Phase 3: Blueprint Exposure Layer
 
+*(*Note: `techdebt.md` analysis confirms many items below are still placeholders and require full implementation.*)*
+
 -   [ ] **3.1. Expand Blueprint Function Library (Medium Priority)**
+    -   [ ] Clarify and consolidate normalization approaches (Z-score vs. min-max), per `techdebt.md` (Issue #5).
+    -   [ ] Implement placeholder conversion functions in `URLToolsBlueprintFunctionLibrary.cpp` to call `RLToolsConversionUtils`, per `techdebt.md` (Issue #5).
     -   [ ] Implement actual data marshalling and conversion logic for rl_tools matrices in Blueprint nodes (currently stubs).
     -   [ ] Expose opaque handles or serialization for rl_tools matrices for Blueprint use.
     -   [ ] Expand `URLToolsBlueprintFunctionLibrary` for common RL-related utilities accessible from Blueprints.

@@ -29,7 +29,7 @@ URLAgentManager::URLAgentManager()
 	TrainingStatus.ReplayBufferSize = 0;
 }
 
-bool URLAgentManager::InitializeAgent(URLEnvironmentComponent* InEnvironmentComponent, const FRLTrainingConfig& InTrainingConfig)
+bool URLAgentManager::InitializeAgent(URLEnvironmentComponent* InEnvironmentComponent, const FLocalRLTrainingConfig& InTrainingConfig)
 {
     if (!InEnvironmentComponent)
     {

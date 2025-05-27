@@ -31,7 +31,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPolicySaved, bool, bSuccess);
  * Training configuration structure
  */
 USTRUCT(BlueprintType)
-struct UERLTOOLS_API FRLTrainingConfig
+struct UERLTOOLS_API FLocalRLTrainingConfig
 {
 	GENERATED_BODY()
 
@@ -127,7 +127,7 @@ public:
 
 	// Training configuration
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Training")
-	FRLTrainingConfig TrainingConfig;
+	FLocalRLTrainingConfig TrainingConfig;
 
 	// Current training status
 	UPROPERTY(BlueprintReadOnly, Category = "Training")
@@ -148,7 +148,7 @@ public:
 
 	// Initialization
 	UFUNCTION(BlueprintCallable, Category = "Agent")
-	bool InitializeAgent(URLEnvironmentComponent* InEnvironmentComponent, const FRLTrainingConfig& InTrainingConfig);
+	bool InitializeAgent(URLEnvironmentComponent* InEnvironmentComponent, const FLocalRLTrainingConfig& InTrainingConfig);
 
 	// Training functions
 	UFUNCTION(BlueprintCallable, Category = "Training")
