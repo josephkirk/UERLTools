@@ -17,12 +17,12 @@ void URLAgentManagerSubsystem::Initialize(FSubsystemCollectionBase& Collection)
     UE_LOG(LOG_UERLTOOLS, Log, TEXT("URLAgentManagerSubsystem Initializing..."));
 
     // Initialize rl_tools global device context
-    rlt_context = (rlt::devices::DefaultCPU::CONTEXT_TYPE*)rlt::malloc(rlt_device, sizeof(rlt::devices::DefaultCPU::CONTEXT_TYPE));
+    rlt_context = (rl_tools::devices::DefaultCPU::CONTEXT_TYPE*)rl_tools::malloc(rlt_device, sizeof(rl_tools::devices::DefaultCPU::CONTEXT_TYPE));
     if (!rlt_context) {
         UE_LOG(LOG_UERLTOOLS, Fatal, TEXT("Failed to allocate rl_tools context!"));
         return; // Early exit if context allocation fails
     }
-    rlt::init(rlt_device, rlt_context);
+    rl_tools::init(rlt_device, rlt_context);
     UE_LOG(LOG_UERLTOOLS, Log, TEXT("URLAgentManagerSubsystem Initialized with rl_tools context."));
 }
 
@@ -46,7 +46,7 @@ void URLAgentManagerSubsystem::Deinitialize()
     // Deallocate rl_tools global device context
     if (rlt_context)
     {
-        rlt::free(rlt_device, rlt_context);
+        rl_tools::free(rlt_device, rlt_context);
         rlt_context = nullptr;
         UE_LOG(LOG_UERLTOOLS, Log, TEXT("rl_tools context freed."));
     }
@@ -100,7 +100,7 @@ bool URLAgentManagerSubsystem::ConfigureAgent(FName AgentName, URLEnvironmentCom
 {
     UE_LOG(LOG_UERLTOOLS, Warning, TEXT("ConfigureAgent is deprecated for agent '%s'. Use CreateAgent instead."), *AgentName.ToString());
     // REMOVE ALL PREVIOUS RL_TOOLS INITIALIZATION LOGIC FROM HERE
-    // (the rlt::malloc and rlt::init calls for policy, optimizer, actor_critic, replay_buffer)
+    // (the rl_tools::malloc and rl_tools::init calls for policy, optimizer, actor_critic, replay_buffer)
     // That logic now belongs in URLAgentManager::InitializeAgentLogic
     return CreateAgent(AgentName, EnvironmentComponent, TrainingConfig);
 }

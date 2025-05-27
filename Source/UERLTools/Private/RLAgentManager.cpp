@@ -72,10 +72,10 @@ bool URLAgentManager::InitializeAgent(URLEnvironmentComponent* InEnvironmentComp
         // For example, if ActorNetwork and CriticNetwork were to be initialized here:
         // ActorNetwork = new ActorNetworkType();
         // CriticNetwork = new CriticNetworkType();
-        // rlt::malloc(device, *ActorNetwork);
-        // rlt::malloc(device, *CriticNetwork);
-        // rlt::init_weights(device, *ActorNetwork, device.random_float_cpu);
-        // rlt::init_weights(device, *CriticNetwork, device.random_float_cpu);
+        // rl_tools::malloc(device, *ActorNetwork);
+        // rl_tools::malloc(device, *CriticNetwork);
+        // rl_tools::init_weights(device, *ActorNetwork, device.random_float_cpu);
+        // rl_tools::init_weights(device, *CriticNetwork, device.random_float_cpu);
 
         bIsInitialized = true;
         UERL_LOG( TEXT("URLAgentManager::InitializeAgent() - Agent initialized successfully"));
@@ -287,7 +287,7 @@ bool URLAgentManager::ValidateEnvironment() const
 	}
 
 }
-bool URLAgentManager::InitializeAgentLogic(URLEnvironmentComponent* InEnvironmentComponent, const FLocalRLTrainingConfig& InTrainingConfig, rlt::devices::DefaultCPU::CONTEXT_TYPE* InRltContext, FName InAgentName)
+bool URLAgentManager::InitializeAgentLogic(URLEnvironmentComponent* InEnvironmentComponent, const FLocalRLTrainingConfig& InTrainingConfig, rl_tools::devices::DefaultCPU::CONTEXT_TYPE* InRltContext, FName InAgentName)
 {
     if (!InEnvironmentComponent)
     {
@@ -336,8 +336,8 @@ bool URLAgentManager::InitializeAgentLogic(URLEnvironmentComponent* InEnvironmen
         // Initialize networks and other RL components here
         // This is a placeholder for actual network initialization
         // ActorNetwork = new ActorNetworkType();
-        // rlt::malloc(device, *ActorNetwork);
-        // rlt::init_weights(device, *ActorNetwork, device.random_float_cpu);
+        // rl_tools::malloc(device, *ActorNetwork);
+        // rl_tools::init_weights(device, *ActorNetwork, device.random_float_cpu);
 
         bIsInitialized = true;
         UERL_LOG(TEXT("URLAgentManager::InitializeAgentLogic() - Agent '%s' initialized successfully"), *AgentName.ToString());
@@ -403,7 +403,7 @@ void URLAgentManager::CleanupNetworks()
     {
         try
         {
-            rlt::free(device, *ActorNetwork);
+            rl_tools::free(device, *ActorNetwork);
         }
         catch (...)
         {
@@ -417,7 +417,7 @@ void URLAgentManager::CleanupNetworks()
     {
         try
         {
-            rlt::free(device, *CriticNetwork);
+            rl_tools::free(device, *CriticNetwork);
         }
         catch (...)
         {

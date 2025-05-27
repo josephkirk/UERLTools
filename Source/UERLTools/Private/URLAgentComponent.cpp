@@ -1,7 +1,7 @@
 // Copyright 2025 NGUYEN PHI HUNG
 
 #include "URLAgentComponent.h"
-#include "URLEnvironmentComponent.h"
+#include "RLEnvironmentComponent.h"
 #include "Subsystems/URLAgentManagerSubsystem.h"
 #include "UERLLog.h"
 #include "GameFramework/Actor.h"

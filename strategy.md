@@ -38,7 +38,7 @@ public:
 
 ```cpp
 // Note: This is a conceptual example, actual implementation would need more detail
-namespace rlt::rl::environments {
+namespace rl_tools::rl::environments {
 
 // Forward declare template parameters for environment spec
 template<typename T, typename TI, TI OBS_DIM, TI ACT_DIM>
@@ -103,7 +103,7 @@ static void initial_state(DEVICE& device, UEEnvironmentAdapter<SPEC>& env,
 
 // Additional API functions: step, observe, reward, terminated...
 
-} // namespace rlt::rl::environments
+} // namespace rl_tools::rl::environments
 ```
 
 **Rationale:**
@@ -164,26 +164,26 @@ class UERLTOOLS_API URLToolsBlueprintFunctionLibrary : public UBlueprintFunction
 // Convert from UE TArray to RLtools Matrix
 template<typename DEVICE, typename SPEC>
 static void TArrayToRLToolsMatrix(DEVICE& device, const TArray<float>& Source, 
-                                 rlt::Matrix<DEVICE, typename SPEC::FLOAT_TYPE, 1, SPEC::OBSERVATION_DIM>& Target) {
+                                 rl_tools::Matrix<DEVICE, typename SPEC::FLOAT_TYPE, 1, SPEC::OBSERVATION_DIM>& Target) {
     // Validation
     check(Source.Num() == SPEC::OBSERVATION_DIM);
     
     // Copy data
     for (int i = 0; i < SPEC::OBSERVATION_DIM; i++) {
-        rlt::set(device, Target, 0, i, Source[i]);
+        rl_tools::set(device, Target, 0, i, Source[i]);
     }
 }
 
 // Convert from RLtools Matrix to UE TArray
 template<typename DEVICE, typename SPEC>
 static TArray<float> RLToolsMatrixToTArray(DEVICE& device, 
-                                         const rlt::Matrix<DEVICE, typename SPEC::FLOAT_TYPE, 1, SPEC::ACTION_DIM>& Source) {
+                                         const rl_tools::Matrix<DEVICE, typename SPEC::FLOAT_TYPE, 1, SPEC::ACTION_DIM>& Source) {
     TArray<float> Result;
     Result.SetNumUninitialized(SPEC::ACTION_DIM);
     
     // Copy data
     for (int i = 0; i < SPEC::ACTION_DIM; i++) {
-        Result[i] = rlt::get(device, Source, 0, i);
+        Result[i] = rl_tools::get(device, Source, 0, i);
     }
     
     return Result;
@@ -211,25 +211,25 @@ bool URLAgentManagerSubsystem::InitializeAgent(URLEnvironmentComponent* InEnviro
     TrainingConfig = InTrainingConfig;
     
     // Setup device
-    using DEVICE = rlt::devices::DefaultCPU;
+    using DEVICE = rl_tools::devices::DefaultCPU;
     DEVICE device;
     
     // Create environment adapter
-    using ENV_SPEC = rlt::rl::environments::UEEnvironmentSpec<float, int, 
+    using ENV_SPEC = rl_tools::rl::environments::UEEnvironmentSpec<float, int, 
                                                          InTrainingConfig.ObservationDimension, 
                                                          InTrainingConfig.ActionDimension>;
-    using ENV_ADAPTER = rlt::rl::environments::UEEnvironmentAdapter<ENV_SPEC>;
+    using ENV_ADAPTER = rl_tools::rl::environments::UEEnvironmentAdapter<ENV_SPEC>;
     
     // Configure the actor-critic agent
-    using AC_SPEC = rlt::rl::algorithms::td3::DefaultParameters<DEVICE, ENV_ADAPTER>;
-    using AC = rlt::rl::algorithms::td3::ActorCritic<AC_SPEC>;
+    using AC_SPEC = rl_tools::rl::algorithms::td3::DefaultParameters<DEVICE, ENV_ADAPTER>;
+    using AC = rl_tools::rl::algorithms::td3::ActorCritic<AC_SPEC>;
     
     // Allocate memory for our agent
     AgentPtr = new AC();
     AC& agent = *reinterpret_cast<AC*>(AgentPtr);
     
     // Initialize the agent components with RLtools functions
-    rlt::malloc(device, agent);
+    rl_tools::malloc(device, agent);
     
     // Set up actor, critic networks with dimensions from TrainingConfig
     // Initialize optimizers, etc.
@@ -237,15 +237,15 @@ bool URLAgentManagerSubsystem::InitializeAgent(URLEnvironmentComponent* InEnviro
     
     // Initialize agent with our parameters
     AC::Buffers buffers;
-    rlt::malloc(device, buffers);
+    rl_tools::malloc(device, buffers);
     AC::Parameters parameters;
     // Configure parameters from TrainingConfig
     // ...
     
-    rlt::init(device, agent, parameters, buffers, true);
+    rl_tools::init(device, agent, parameters, buffers, true);
     
     // Free temporary buffers
-    rlt::free(device, buffers);
+    rl_tools::free(device, buffers);
     
     return true;
 }
@@ -253,14 +253,14 @@ bool URLAgentManagerSubsystem::InitializeAgent(URLEnvironmentComponent* InEnviro
 void URLAgentManagerSubsystem::Deinitialize() {
     // Clean up RLtools resources
     if (AgentPtr) {
-        using DEVICE = rlt::devices::DefaultCPU;
+        using DEVICE = rl_tools::devices::DefaultCPU;
         DEVICE device;
         
         using AC_SPEC = /* Same as above */;
-        using AC = rlt::rl::algorithms::td3::ActorCritic<AC_SPEC>;
+        using AC = rl_tools::rl::algorithms::td3::ActorCritic<AC_SPEC>;
         
         AC& agent = *reinterpret_cast<AC*>(AgentPtr);
-        rlt::free(device, agent);
+        rl_tools::free(device, agent);
         
         delete reinterpret_cast<AC*>(AgentPtr);
         AgentPtr = nullptr;
@@ -335,25 +335,25 @@ void URLAgentManagerSubsystem::FRLTrainingTask::DoWork() {
     if (!Subsystem || !Subsystem->AgentPtr) return;
     
     // Setup device and access our agent
-    using DEVICE = rlt::devices::DefaultCPU;
+    using DEVICE = rl_tools::devices::DefaultCPU;
     DEVICE device;
     
     // Configure the actor-critic agent (same typedefs as in InitializeAgent)
     using AC_SPEC = /* Same as above */;
-    using AC = rlt::rl::algorithms::td3::ActorCritic<AC_SPEC>;
+    using AC = rl_tools::rl::algorithms::td3::ActorCritic<AC_SPEC>;
     
     AC& agent = *reinterpret_cast<AC*>(Subsystem->AgentPtr);
     
     // Create a loop state for training
-    using LOOP_STATE = rlt::rl::loop::LoopState<AC_SPEC>;
+    using LOOP_STATE = rl_tools::rl::loop::LoopState<AC_SPEC>;
     LOOP_STATE loop_state;
-    rlt::malloc(device, loop_state);
-    rlt::init(device, loop_state);
+    rl_tools::malloc(device, loop_state);
+    rl_tools::init(device, loop_state);
     
     // Training loop
     for (int32 i = 0; i < StepsToPerform && !Subsystem->ShouldStopTraining; i++) {
         // Perform one training step
-        rlt::step(device, agent, loop_state);
+        rl_tools::step(device, agent, loop_state);
         
         // Update progress tracking
         FScopeLock Lock(&Subsystem->ProgressLock);
@@ -370,7 +370,7 @@ void URLAgentManagerSubsystem::FRLTrainingTask::DoWork() {
     Subsystem->BroadcastTrainingProgress();
     
     // Clean up
-    rlt::free(device, loop_state);
+    rl_tools::free(device, loop_state);
     
     // Notify training completion
     if (!Subsystem->ShouldStopTraining) {
@@ -472,24 +472,24 @@ TArray<float> URLAgentManagerSubsystem::GetAction(const TArray<float>& Observati
     if (!AgentPtr) return TArray<float>(); // Return empty array if agent not initialized
     
     // Setup device
-    using DEVICE = rlt::devices::DefaultCPU;
+    using DEVICE = rl_tools::devices::DefaultCPU;
     DEVICE device;
     
     // Access the agent's policy network
     using AC_SPEC = /* Same as in InitializeAgent */;
-    using AC = rlt::rl::algorithms::td3::ActorCritic<AC_SPEC>;
+    using AC = rl_tools::rl::algorithms::td3::ActorCritic<AC_SPEC>;
     
     AC& agent = *reinterpret_cast<AC*>(AgentPtr);
     
     // Convert observation to RLtools format
-    rlt::Matrix<DEVICE, float, 1, AC_SPEC::OBSERVATION_DIM> observation_matrix;
+    rl_tools::Matrix<DEVICE, float, 1, AC_SPEC::OBSERVATION_DIM> observation_matrix;
     TArrayToRLToolsMatrix<DEVICE, AC_SPEC>(device, Observation, observation_matrix);
     
     // Create an output matrix for the action
-    rlt::Matrix<DEVICE, float, 1, AC_SPEC::ACTION_DIM> action_matrix;
+    rl_tools::Matrix<DEVICE, float, 1, AC_SPEC::ACTION_DIM> action_matrix;
     
     // Evaluate the policy (get action from observation)
-    rlt::evaluate(device, agent.actor, observation_matrix, action_matrix);
+    rl_tools::evaluate(device, agent.actor, observation_matrix, action_matrix);
     
     // Convert back to TArray
     return RLToolsMatrixToTArray<DEVICE, AC_SPEC>(device, action_matrix);
@@ -568,14 +568,14 @@ UFUNCTION(BlueprintCallable, Category = "RLTools|Inference")
 TArray<float> GetAction(const TArray<float>& Observation) {
     // Select device based on settings
     if (bUseCPU) {
-        rlt::devices::DefaultCPU device;
+        rl_tools::devices::DefaultCPU device;
         return GetActionWithDevice(device, Observation);
     } else {
         // GPU implementation when available
-        // rlt::devices::DefaultCUDA device;
+        // rl_tools::devices::DefaultCUDA device;
         // return GetActionWithDevice(device, Observation);
         // For now, fall back to CPU
-        rlt::devices::DefaultCPU device;
+        rl_tools::devices::DefaultCPU device;
         return GetActionWithDevice(device, Observation);
     }
 }

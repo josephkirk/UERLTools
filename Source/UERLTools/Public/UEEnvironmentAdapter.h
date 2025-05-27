@@ -10,7 +10,7 @@
 
 // RL Tools core includes
 #include "rl_tools/rl/environments/environments.h" // Basic environment spec
-#include "rl_tools/rl/utils/validation.h"         // For rlt::utils::typing (Action/Observation wrappers)
+#include "rl_tools/rl/utils/validation.h"         // For rl_tools::utils::typing (Action/Observation wrappers)
 #include "rl_tools/utils/generic/memcpy.h"        // For rl_tools::copy_view
 
 // Forward declaration if URLEnvironmentComponent.h is not included above (definition needed for template instantiation)
@@ -196,7 +196,7 @@ namespace rl_tools {
 
 // RL Tools includes - adjust as necessary for specific types
 #include "rl_tools/rl/environments/environments.h" // For base environment concepts if any
-#include "rl_tools/utils/generic/typing.h" // For rlt::utils::typing::ActionType
+#include "rl_tools/utils/generic/typing.h" // For rl_tools::utils::typing::ActionType
 #include "rl_tools/operations/cpu.h" // Or operations_cpu_mux.h, depending on what's needed
 
 // Forward declaration
@@ -212,7 +212,7 @@ namespace rl_tools {
  * rl_tools (like step, observe) into calls on the URLEnvironmentComponent and converts
  * data between UE types and rl_tools tensor types.
  *
- * @tparam T_DEVICE The rl_tools device (e.g., rlt::devices::DefaultCPU).
+ * @tparam T_DEVICE The rl_tools device (e.g., rl_tools::devices::DefaultCPU).
  * @tparam T_SPEC The rl_tools environment specification, defining observation/action spaces.
  *                This SPEC needs to be compatible with the adapted URLEnvironmentComponent.
  */
@@ -286,7 +286,7 @@ namespace rl_tools {
             UERL_RL_ERROR( TEXT("InitialObservationData.Num() [%d] != SPEC::OBSERVATION_DIM [%d]"), InitialObservationData.Num(), SPEC::OBSERVATION_DIM);
             return;
         }
-        // Example: rlt::Matrix<T, 1, SPEC::OBSERVATION_DIM>* obs_matrix = static_cast<rlt::Matrix<T, 1, SPEC::OBSERVATION_DIM>*>(&state);
+        // Example: rl_tools::Matrix<T, 1, SPEC::OBSERVATION_DIM>* obs_matrix = static_cast<rl_tools::Matrix<T, 1, SPEC::OBSERVATION_DIM>*>(&state);
         // for (typename DEVICE::index_t i = 0; i < SPEC::OBSERVATION_DIM; ++i) {
         //     obs_matrix->data[i] = static_cast<T>(InitialObservationData[i]);
         // }
@@ -321,7 +321,7 @@ namespace rl_tools {
             UERL_RL_ERROR( TEXT("NextObservationData.Num() [%d] != SPEC::OBSERVATION_DIM [%d]"), NextObservationData.Num(), SPEC::OBSERVATION_DIM);
             return;
         }
-        // Example: rlt::Matrix<T, 1, SPEC::OBSERVATION_DIM>* next_obs_matrix = static_cast<rlt::Matrix<T, 1, SPEC::OBSERVATION_DIM>*>(&next_state);
+        // Example: rl_tools::Matrix<T, 1, SPEC::OBSERVATION_DIM>* next_obs_matrix = static_cast<rl_tools::Matrix<T, 1, SPEC::OBSERVATION_DIM>*>(&next_state);
         // for (typename DEVICE::index_t i = 0; i < SPEC::OBSERVATION_DIM; ++i) {
         //     next_obs_matrix->data[i] = static_cast<T>(NextObservationData[i]);
         // }

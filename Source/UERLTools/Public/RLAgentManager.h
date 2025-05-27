@@ -127,7 +127,7 @@ public:
 
 	// Called by URLAgentManagerSubsystem to initialize the agent with its environment and config
 	// This is where rl_tools components will be allocated and initialized.
-	bool InitializeAgentLogic(URLEnvironmentComponent* InEnvironmentComponent, const FLocalRLTrainingConfig& InTrainingConfig, rlt::devices::DefaultCPU::CONTEXT_TYPE* InRltContext, FName InAgentName = NAME_None);
+	bool InitializeAgentLogic(URLEnvironmentComponent* InEnvironmentComponent, const FLocalRLTrainingConfig& InTrainingConfig, rl_tools::devices::DefaultCPU::CONTEXT_TYPE* InRltContext, FName InAgentName = NAME_None);
 
 
 	// Training configuration
@@ -201,7 +201,7 @@ public:
 
 protected:
 	// rl_tools types and constants
-	using DEVICE = rlt::devices::DefaultCPU;
+	using DEVICE = rl_tools::devices::DefaultCPU;
 	using T = float;
 	using TI = typename DEVICE::index_t;
 
@@ -220,15 +220,15 @@ protected:
 			using T = UERLAgentEnvironmentSpec::T;
 			using TI = UERLAgentEnvironmentSpec::TI;
 			static constexpr TI DIM = UERLAgentEnvironmentSpec::OBSERVATION_DIM;
-			using SPEC = rlt::matrix::Specification<T, TI, 1, DIM>;
-			template <typename CONFIG> using Matrix = rlt::MatrixStatic<CONFIG>; // Assuming fixed size observations
+			using SPEC = rl_tools::matrix::Specification<T, TI, 1, DIM>;
+			template <typename CONFIG> using Matrix = rl_tools::MatrixStatic<CONFIG>; // Assuming fixed size observations
 		};
 		struct ACTION_SPEC {
 			using T = UERLAgentEnvironmentSpec::T;
 			using TI = UERLAgentEnvironmentSpec::TI;
 			static constexpr TI DIM = UERLAgentEnvironmentSpec::ACTION_DIM;
-			using SPEC = rlt::matrix::Specification<T, TI, 1, DIM>;
-			template <typename CONFIG> using Matrix = rlt::MatrixStatic<CONFIG>; // Assuming fixed size actions
+			using SPEC = rl_tools::matrix::Specification<T, TI, 1, DIM>;
+			template <typename CONFIG> using Matrix = rl_tools::MatrixStatic<CONFIG>; // Assuming fixed size actions
 		};
 		// Note: The UEEnvironmentAdapter itself defines its State struct internally.
 		// This UERLAgentEnvironmentSpec is primarily for configuring other rl_tools components
@@ -241,17 +241,17 @@ protected:
 	// Core rl_tools components for this agent instance
 	// These will be properly typed and allocated in InitializeAgentLogic
 	// Example types (actual types are complex templates):
-	// typename rlt::rl::algorithms::td3::ActorCritic<ACTOR_CRITIC_SPEC>::template Instance actor_critic;
-	// typename rlt::rl::components::off_policy_runner::Buffer<OFF_POLICY_RUNNER_SPEC>::template Instance replay_buffer;
-	// typename rlt::rl::components::replay_buffer::ReplayBuffer<REPLAY_BUFFER_SPEC>::template Instance replay_buffer_struct; // If using standalone replay buffer
-	// typename rlt::rl::algorithms::td3::Actor<ACTOR_SPEC>::template Instance actor_network;
-	// typename rlt::rl::algorithms::td3::Critic<CRITIC_SPEC>::template Instance critic_network_1;
-	// typename rlt::rl::algorithms::td3::Critic<CRITIC_SPEC>::template Instance critic_network_2;
-	// typename rlt::rl::algorithms::td3::Actor<ACTOR_SPEC>::template Instance target_actor_network;
-	// typename rlt::rl::algorithms::td3::Critic<CRITIC_SPEC>::template Instance target_critic_network_1;
-	// typename rlt::rl::algorithms::td3::Critic<CRITIC_SPEC>::template Instance target_critic_network_2;
-	// typename rlt::nn::optimizers::adam::Optimizer actor_optimizer;
-	// typename rlt::nn::optimizers::adam::Optimizer critic_optimizer;
+	// typename rl_tools::rl::algorithms::td3::ActorCritic<ACTOR_CRITIC_SPEC>::template Instance actor_critic;
+	// typename rl_tools::rl::components::off_policy_runner::Buffer<OFF_POLICY_RUNNER_SPEC>::template Instance replay_buffer;
+	// typename rl_tools::rl::components::replay_buffer::ReplayBuffer<REPLAY_BUFFER_SPEC>::template Instance replay_buffer_struct; // If using standalone replay buffer
+	// typename rl_tools::rl::algorithms::td3::Actor<ACTOR_SPEC>::template Instance actor_network;
+	// typename rl_tools::rl::algorithms::td3::Critic<CRITIC_SPEC>::template Instance critic_network_1;
+	// typename rl_tools::rl::algorithms::td3::Critic<CRITIC_SPEC>::template Instance critic_network_2;
+	// typename rl_tools::rl::algorithms::td3::Actor<ACTOR_SPEC>::template Instance target_actor_network;
+	// typename rl_tools::rl::algorithms::td3::Critic<CRITIC_SPEC>::template Instance target_critic_network_1;
+	// typename rl_tools::rl::algorithms::td3::Critic<CRITIC_SPEC>::template Instance target_critic_network_2;
+	// typename rl_tools::nn::optimizers::adam::Optimizer actor_optimizer;
+	// typename rl_tools::nn::optimizers::adam::Optimizer critic_optimizer;
 
 	// Pointers to allocated rl_tools buffers (managed by this class)
 	void* rlt_actor_critic_buffer = nullptr;
@@ -259,7 +259,7 @@ protected:
 	void* rlt_off_policy_runner_buffer = nullptr;
 
 	// Environment Adapter specific to this agent's URLEnvironmentComponent instance
-	// rlt::rl::environments::UEEnvironmentAdapter<UERLAgentEnvironmentSpec> RLEnvironmentAdapter;
+	// rl_tools::rl::environments::UEEnvironmentAdapter<UERLAgentEnvironmentSpec> RLEnvironmentAdapter;
 	// This would be tricky as UERLAgentEnvironmentSpec needs dynamic OBS_DIM/ACT_DIM.
 	// Instead, we'll store the dimensions and use them to initialize templated types locally in functions.
 	TI ObservationDim = 0;
@@ -269,48 +269,48 @@ protected:
 	// This context might be shared from the subsystem or created per agent.
 	// For now, assume it's passed in or a new one is created if null.
 	DEVICE rlt_device_instance; // The device instance itself
-	rlt::devices::DefaultCPU::CONTEXT_TYPE* rlt_context_ptr = nullptr; // Pointer to the context
+	rl_tools::devices::DefaultCPU::CONTEXT_TYPE* rlt_context_ptr = nullptr; // Pointer to the context
 
 	// Network architecture constants
 	static constexpr TI HIDDEN_DIM = 64;
 	static constexpr TI NUM_LAYERS = 2;
-	static constexpr auto ACTIVATION_FUNCTION = rlt::nn::activation_functions::ActivationFunction::RELU;
+	static constexpr auto ACTIVATION_FUNCTION = rl_tools::nn::activation_functions::ActivationFunction::RELU;
 
 	// Actor network type
 	// These specs depend on the environment's observation and action dimensions for input/output layers.
 	// However, rl_tools MLP structures are often defined by hidden layers, input/output are inferred or set at instantiation.
 	// For now, let's assume these are generic MLP structures.
-	using ACTOR_STRUCTURE_SPEC = rlt::nn_models::mlp::StructureSpecification<T, TI, UERLAgentEnvironmentSpec::OBSERVATION_DIM, UERLAgentEnvironmentSpec::ACTION_DIM, HIDDEN_DIM, NUM_LAYERS, ACTIVATION_FUNCTION, rlt::nn::activation_functions::TANH>; // Actor output usually tanh
-	using ACTOR_SPEC = rlt::nn_models::mlp::AdamSpecification<ACTOR_STRUCTURE_SPEC>;
-	using ACTOR_TYPE = rlt::nn_models::mlp::NeuralNetworkAdam<ACTOR_SPEC>;
+	using ACTOR_STRUCTURE_SPEC = rl_tools::nn_models::mlp::StructureSpecification<T, TI, UERLAgentEnvironmentSpec::OBSERVATION_DIM, UERLAgentEnvironmentSpec::ACTION_DIM, HIDDEN_DIM, NUM_LAYERS, ACTIVATION_FUNCTION, rl_tools::nn::activation_functions::TANH>; // Actor output usually tanh
+	using ACTOR_SPEC = rl_tools::nn_models::mlp::AdamSpecification<ACTOR_STRUCTURE_SPEC>;
+	using ACTOR_TYPE = rl_tools::nn_models::mlp::NeuralNetworkAdam<ACTOR_SPEC>;
 
 	// Critic network type (takes observation and action as input)
 	// The input dimension for the critic is ObservationDim + ActionDim.
 	// We'll need a custom StructureSpecification or handle this during instantiation if rl_tools doesn't directly support it in the generic MLP spec.
 	// For simplicity, we'll assume a critic structure that can be configured or adapted.
 	// This might require a more specific critic network structure definition later.
-	using CRITIC_STRUCTURE_SPEC = rlt::nn_models::mlp::StructureSpecification<T, TI, UERLAgentEnvironmentSpec::OBSERVATION_DIM + UERLAgentEnvironmentSpec::ACTION_DIM, 1, HIDDEN_DIM, NUM_LAYERS, ACTIVATION_FUNCTION, rlt::nn::activation_functions::IDENTITY>; // Critic output is Q-value
-	using CRITIC_SPEC = rlt::nn_models::mlp::AdamSpecification<CRITIC_STRUCTURE_SPEC>;
-	using CRITIC_TYPE = rlt::nn_models::mlp::NeuralNetworkAdam<CRITIC_SPEC>;
+	using CRITIC_STRUCTURE_SPEC = rl_tools::nn_models::mlp::StructureSpecification<T, TI, UERLAgentEnvironmentSpec::OBSERVATION_DIM + UERLAgentEnvironmentSpec::ACTION_DIM, 1, HIDDEN_DIM, NUM_LAYERS, ACTIVATION_FUNCTION, rl_tools::nn::activation_functions::IDENTITY>; // Critic output is Q-value
+	using CRITIC_SPEC = rl_tools::nn_models::mlp::AdamSpecification<CRITIC_STRUCTURE_SPEC>;
+	using CRITIC_TYPE = rl_tools::nn_models::mlp::NeuralNetworkAdam<CRITIC_SPEC>;
 
 	// TD3 Parameters
-	using TD3_PARAMETERS = rlt::rl::algorithms::td3::Parameters<T, TI>;
+	using TD3_PARAMETERS = rl_tools::rl::algorithms::td3::Parameters<T, TI>;
 
 	// Actor-Critic type
-	using ACTOR_CRITIC_SPEC = rlt::rl::algorithms::td3::Specification<T, TI, UERLAgentEnvironmentSpec, ACTOR_TYPE, CRITIC_TYPE, TD3_PARAMETERS>;
-	using ACTOR_CRITIC_TYPE = rlt::rl::algorithms::td3::ActorCritic<ACTOR_CRITIC_SPEC>;
+	using ACTOR_CRITIC_SPEC = rl_tools::rl::algorithms::td3::Specification<T, TI, UERLAgentEnvironmentSpec, ACTOR_TYPE, CRITIC_TYPE, TD3_PARAMETERS>;
+	using ACTOR_CRITIC_TYPE = rl_tools::rl::algorithms::td3::ActorCritic<ACTOR_CRITIC_SPEC>;
 
 	// Replay Buffer
 	static constexpr TI REPLAY_BUFFER_CAPACITY = 100000; // Example capacity
-	using REPLAY_BUFFER_SPEC = rlt::rl::components::replay_buffer::Specification<T, TI, UERLAgentEnvironmentSpec::OBSERVATION_DIM, UERLAgentEnvironmentSpec::ACTION_DIM, REPLAY_BUFFER_CAPACITY>;
-	using REPLAY_BUFFER_TYPE = rlt::rl::components::ReplayBuffer<REPLAY_BUFFER_SPEC>;
+	using REPLAY_BUFFER_SPEC = rl_tools::rl::components::replay_buffer::Specification<T, TI, UERLAgentEnvironmentSpec::OBSERVATION_DIM, UERLAgentEnvironmentSpec::ACTION_DIM, REPLAY_BUFFER_CAPACITY>;
+	using REPLAY_BUFFER_TYPE = rl_tools::rl::components::ReplayBuffer<REPLAY_BUFFER_SPEC>;
 
 	// Off-Policy Runner
 	// The OffPolicyRunner needs the actual UEEnvironmentAdapter type, not just its spec.
 	// Let's define the adapter type first.
 	using ENVIRONMENT_ADAPTER_TYPE = UEEnvironmentAdapter<DEVICE, UERLAgentEnvironmentSpec>;
-	using OFF_POLICY_RUNNER_SPEC = rlt::rl::components::off_policy_runner::Specification<T, TI, ENVIRONMENT_ADAPTER_TYPE, REPLAY_BUFFER_TYPE::CAPACITY, typename ACTOR_CRITIC_TYPE::ParametersType::OFF_POLICY_RUNNER_PARAMETERS_TYPE>;
-    using OFF_POLICY_RUNNER_TYPE = rlt::rl::components::OffPolicyRunner<OFF_POLICY_RUNNER_SPEC>;
+	using OFF_POLICY_RUNNER_SPEC = rl_tools::rl::components::off_policy_runner::Specification<T, TI, ENVIRONMENT_ADAPTER_TYPE, REPLAY_BUFFER_TYPE::CAPACITY, typename ACTOR_CRITIC_TYPE::ParametersType::OFF_POLICY_RUNNER_PARAMETERS_TYPE>;
+    using OFF_POLICY_RUNNER_TYPE = rl_tools::rl::components::OffPolicyRunner<OFF_POLICY_RUNNER_SPEC>;
 
 private:
     // rl_tools instances

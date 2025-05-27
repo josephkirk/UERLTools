@@ -6,7 +6,7 @@ struct FRLTrainingConfig;     // Assuming this USTRUCT is defined, e.g., in RLTy
 class URLAgentManager;        // Forward declaration for URLAgentManager
 
 THIRD_PARTY_INCLUDES_START
-#include <rl_tools/operations/cpu.h> // For rlt::devices::DefaultCPU, rlt::malloc, rlt::free, rlt::init
+#include <rl_tools/operations/cpu.h> // For rl_tools::devices::DefaultCPU, rl_tools::malloc, rl_tools::free, rl_tools::init
 THIRD_PARTY_INCLUDES_END
 
 #include "CoreMinimal.h"
@@ -99,6 +99,6 @@ private:
 
     // TODO: Add rl_tools global device context if needed
     // rl_tools global device and context
-    rlt::devices::DefaultCPU rlt_device; // rl_tools device instance
-    rlt::devices::DefaultCPU::CONTEXT_TYPE* rlt_context = nullptr; // Pointer to the global rl_tools context for CPU operations
+    rl_tools::devices::DefaultCPU rlt_device; // rl_tools device instance
+    rl_tools::devices::DefaultCPU::CONTEXT_TYPE* rlt_context = nullptr; // Pointer to the global rl_tools context for CPU operations
 };

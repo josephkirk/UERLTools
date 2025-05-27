@@ -138,7 +138,7 @@ protected:
 
 private:
 	// rl_tools device
-	//rlt::devices::DefaultCPU Device;
+	//rl_tools::devices::DefaultCPU Device;
 
 	// Last observation cache
 	TArray<float> LastObservation;

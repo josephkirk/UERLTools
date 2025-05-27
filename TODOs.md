@@ -17,7 +17,7 @@ This document outlines the tasks required to create an Unreal Engine plugin that
 -   [X] **1.3. Initial Compilation and Verification**
     -   [X] 1.3.1. Create a test C++ class within the plugin (`RLToolsTest`).
     -   [X] 1.3.2. Include core `rl_tools` headers (e.g., `<rl_tools/operatio  ns/cpu_mux.h>`, `<rl_tools/devices/cpu.h>`).
-    -   [X] 1.3.3. Instantiate basic `rl_tools` types (e.g., `rlt::devices::DefaultCPU`).
+    -   [X] 1.3.3. Instantiate basic `rl_tools` types (e.g., `rl_tools::devices::DefaultCPU`).
     -   [X] 1.3.4. Compile the UE project to ensure `rl_tools` is recognized and builds correctly.
     -   [X] 1.3.5. Address any compilation errors or warnings, potentially by wrapping includes with `THIRD_PARTY_INCLUDES_START`/`THIRD_PARTY_INCLUDES_END` and specific warning pragmas. (Covered by 1.2.3)
 
@@ -28,14 +28,14 @@ This document outlines the tasks required to create an Unreal Engine plugin that
         -   [X] Inherit from `UGameInstanceSubsystem` (or `UWorldSubsystem` if per-level agent lifecycle is strictly needed, but `UGameInstanceSubsystem` is generally preferred for global managers).
         -   [X] This subsystem will be the central point for managing RL agent lifecycles, policies, training, and inference processes.
         -   [X] Implement `Initialize(FSubsystemCollectionBase& Collection)` and `Deinitialize()` methods for robust lifecycle management. (Stubs created, basic structure in place)
-            -   [X] Manage `rl_tools` resource allocation (e.g., using `rlt::malloc`) in `Initialize()` or specific agent creation methods.
+            -   [X] Manage `rl_tools` resource allocation (e.g., using `rl_tools::malloc`) in `Initialize()` or specific agent creation methods.
                 -   Full implementation: Agent context, training config storage, and allocation logic for rl_tools components (policy, optimizer, actor-critic, replay buffer) are now implemented (see URLAgentManagerSubsystem.cpp, 2025-05-26).
-            -   [X] Ensure proper deallocation of `rl_tools` resources (e.g., using `rlt::free`) in `Deinitialize()` or agent destruction methods. (**Critical Priority for memory safety**)
+            -   [X] Ensure proper deallocation of `rl_tools` resources (e.g., using `rl_tools::free`) in `Deinitialize()` or agent destruction methods. (**Critical Priority for memory safety**)
                 -   Cleanup logic for allocated rl_tools resources is now implemented (2025-05-26).
         -   [X] Ensure subsystem is easily accessible from both C++ (e.g., `GetGameInstance()->GetSubsystem<URLAgentManagerSubsystem>()`) and Blueprints. (Achieved by `UGameInstanceSubsystem` nature)
     -   [X] **2.1.2. Implement Environment Adapter (Critical Priority)**
         -   [X] Create a templated C++ adapter class/struct (e.g., `UEEnvironmentAdapter<SPEC>`) to bridge `URLEnvironmentComponent` (or other UE environment representations) with the C++ API expected by `rl_tools`.
-        -   [X] The adapter should implement the necessary static or member functions like `rlt::init`, `rlt::initial_state`, `rlt::step`, `rlt::observe`, `rlt::reward`, and `rlt::terminated`.
+        -   [X] The adapter should implement the necessary static or member functions like `rl_tools::init`, `rl_tools::initial_state`, `rl_tools::step`, `rl_tools::observe`, `rl_tools::reward`, and `rl_tools::terminated`.
         -   [X] Design the adapter to be flexible, allowing for different UE environment sources and efficient data exchange (e.g., minimizing data copies).
         -   [X] Encapsulate environment-specific logic within the adapter, separating it from the core RL agent logic in the subsystem.
     -   [X] **2.1.3. Develop Core C++ Data Conversion & Normalization Utilities (Critical Priority)**
@@ -141,13 +141,13 @@ This document outlines the tasks required to create an Unreal Engine plugin that
 ## Phase 5: Inference Workflow Implementation
 
 -   [ ] **5.1. Optimize Policy Deployment for Inference**
-    -   [ ] Ensure `rl_tools` policy evaluation (`rlt::evaluate`) is efficient for real-time inference within the game loop.
+    -   [ ] Ensure `rl_tools` policy evaluation (`rl_tools::evaluate`) is efficient for real-time inference within the game loop.
     -   [ ] Provide options in `URLAgentManagerSubsystem` or via `FRLInferenceConfig` (if needed) for deterministic vs. stochastic policy evaluation modes during inference.
 -   [ ] **5.2. Real-time Action Generation**
     -   [ ] 5.2.1. Implement the C++ core of `GetAction(FName AgentName, ...)` in `URLAgentManagerSubsystem`. This function should:
         -   Take an observation (already converted to `TArray<float>`).
         -   Convert it to the `rl_tools::Matrix` format (using 2.1.3 utilities).
-        -   Pass it to the loaded `rl_tools` policy for evaluation (`rlt::evaluate`).
+        -   Pass it to the loaded `rl_tools` policy for evaluation (`rl_tools::evaluate`).
         -   Convert the resulting `rl_tools::Matrix` action back to `TArray<float>` (using 2.1.3 utilities).
         -   Return the action.
     -   [ ] 5.2.2. Profile and ensure this entire `GetAction` pipeline is highly performant for use in real-time game loops (e.g., called every frame or AI tick).
@@ -163,7 +163,7 @@ This document outlines the tasks required to create an Unreal Engine plugin that
     -   [ ] Most Blueprint functions in the subsystem (e.g., `ConfigureAgent`, `StartTraining`, `GetAction`) should take an `FName AgentName` parameter.
 -   [ ] **6.2. Device Support Extension (CPU/GPU Flexibility)**
     -   [ ] Refactor all core code to support device abstraction (currently hardcoded for CPU).
-    -   [ ] Template key C++ functions (e.g., in conversion utilities (2.1.3), environment adapter (2.1.2), core `rl_tools` interactions within the subsystem) on `rl_tools` device types (e.g., `rlt::devices::DefaultCPU`, `rlt::devices::DefaultGPU`).
+    -   [ ] Template key C++ functions (e.g., in conversion utilities (2.1.3), environment adapter (2.1.2), core `rl_tools` interactions within the subsystem) on `rl_tools` device types (e.g., `rl_tools::devices::DefaultCPU`, `rl_tools::devices::DefaultGPU`).
     -   [ ] Design data structures and workflows to be adaptable for future GPU support with minimal code duplication. This involves using `rl_tools` device objects appropriately.
     -   [ ] Add configuration options (e.g., in `FRLTrainingConfig`) to select the computation device (CPU/GPU) where applicable, once `rl_tools` GPU operations are integrated.
 -   [ ] **6.3. Parameter Tuning Utilities**

@@ -11,7 +11,7 @@ This document provides high-level recommendations and rationale for improving th
 - **Implementation:** Refactor `URLAgentManager` into `URLAgentManagerSubsystem` inheriting from `UGameInstanceSubsystem`.
 
 ## 2. Environment Abstraction & Adapter Pattern
-- **Recommendation:** Implement an adapter class/struct that bridges Unreal's `URLEnvironmentComponent` to the C++ API expected by `rl_tools` (e.g., static `rlt::step`, `rlt::observe`, etc.).
+- **Recommendation:** Implement an adapter class/struct that bridges Unreal's `URLEnvironmentComponent` to the C++ API expected by `rl_tools` (e.g., static `rl_tools::step`, `rl_tools::observe`, etc.).
     - **Rationale:**
         - Clean separation of engine-facing logic (Blueprint, UE events) and RLtools-facing logic (C++ API).
         - Enables flexible swapping or extension of environments without changing RL agent code.

@@ -32,7 +32,7 @@ public:
 
 private:
     // rl_tools device instance
-    rlt::devices::DefaultCPU device;
+    rl_tools::devices::DefaultCPU device;
     
     // Individual test cases
     bool TestMatrixOperations();

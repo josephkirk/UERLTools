@@ -92,9 +92,9 @@ THIRD_PARTY_INCLUDES_END
 AMyTestActor::AMyTestActor()
 {
     // Try to define an RLtools device
-    rlt::devices::DefaultCPU device; 
+    rl_tools::devices::DefaultCPU device; 
     // Or using the factory:
-    // using DEVICE = rlt::devices::DEVICE_FACTORY<rlt::devices::DefaultCPUSpecification>;
+    // using DEVICE = rl_tools::devices::DEVICE_FACTORY<rl_tools::devices::DefaultCPUSpecification>;
     // DEVICE device_instance;
     UERL_WARNING( TEXT("RLtools types seem accessible."));
 }
@@ -124,21 +124,21 @@ State: A Plain Old Data (POD) struct representing the environment's state from R
 Parameters: An instance of the ENVIRONMENT_PARAMETERS struct.
 
 
-Core Operations (Functions): These functions, typically templated on a DEVICE type (for CPU/GPU context) and taking an RNG (random number generator), define the environment's dynamics. They are often placed in a namespace like rlt::rl::environments or a custom one discoverable by RLtools.
+Core Operations (Functions): These functions, typically templated on a DEVICE type (for CPU/GPU context) and taking an RNG (random number generator), define the environment's dynamics. They are often placed in a namespace like rl_tools::rl::environments or a custom one discoverable by RLtools.
 
-rlt::malloc(DEVICE& device, ENVIRONMENT& env) and rlt::free(DEVICE& device, ENVIRONMENT& env): For allocating and freeing any device-specific memory the environment might need (often a NOP if state is managed by UE5 objects directly and POD state is used).
-rlt::init(DEVICE& device, ENVIRONMENT& env, typename ENVIRONMENT::Parameters& params, RNG& rng): Initializes the environment with specific parameters.
-rlt::sample_initial_state(const DEVICE& device, const ENVIRONMENT& env, typename ENVIRONMENT::Parameters& params, typename ENVIRONMENT::State& state, RNG& rng) or rlt::initial_state(const DEVICE& device, const ENVIRONMENT& env, typename ENVIRONMENT::Parameters& params, typename ENVIRONMENT::State& state): Resets the UE5 enemy and relevant world elements to a starting configuration for a new episode. It then populates the State struct with this initial information.
-rlt::step(const DEVICE& device, const ENVIRONMENT& env, typename ENVIRONMENT::Parameters& params, const typename ENVIRONMENT::State& state, const typename rlt::rl::utils::typing::Action<typename ENVIRONMENT::ACTION_SPEC>::Type& action, typename ENVIRONMENT::State& next_state, RNG& rng): Given the current state and an action from the policy, this function simulates one step in UE5. This involves:
+rl_tools::malloc(DEVICE& device, ENVIRONMENT& env) and rl_tools::free(DEVICE& device, ENVIRONMENT& env): For allocating and freeing any device-specific memory the environment might need (often a NOP if state is managed by UE5 objects directly and POD state is used).
+rl_tools::init(DEVICE& device, ENVIRONMENT& env, typename ENVIRONMENT::Parameters& params, RNG& rng): Initializes the environment with specific parameters.
+rl_tools::sample_initial_state(const DEVICE& device, const ENVIRONMENT& env, typename ENVIRONMENT::Parameters& params, typename ENVIRONMENT::State& state, RNG& rng) or rl_tools::initial_state(const DEVICE& device, const ENVIRONMENT& env, typename ENVIRONMENT::Parameters& params, typename ENVIRONMENT::State& state): Resets the UE5 enemy and relevant world elements to a starting configuration for a new episode. It then populates the State struct with this initial information.
+rl_tools::step(const DEVICE& device, const ENVIRONMENT& env, typename ENVIRONMENT::Parameters& params, const typename ENVIRONMENT::State& state, const typename rl_tools::rl::utils::typing::Action<typename ENVIRONMENT::ACTION_SPEC>::Type& action, typename ENVIRONMENT::State& next_state, RNG& rng): Given the current state and an action from the policy, this function simulates one step in UE5. This involves:
 
 Applying the action to the enemy AI (e.g., moving, turning, attacking).
 Advancing the UE5 simulation (e.g., allowing physics and other game logic to update).
 Populating the next_state struct with the new state of the environment.
 
 
-rlt::observe(const DEVICE& device, const ENVIRONMENT& env, typename ENVIRONMENT::Parameters& params, const typename ENVIRONMENT::State& state, const typename ENVIRONMENT::ObservationPrivileged& observation, RNG& rng) (or similar signature for non-privileged observation): From the current environment state, this function extracts or computes the observation vector that will be fed to the RL policy's neural network.
-rlt::reward(const DEVICE& device, const ENVIRONMENT& env, typename ENVIRONMENT::Parameters& params, const typename ENVIRONMENT::State& state, const typename rlt::rl::utils::typing::Action<typename ENVIRONMENT::ACTION_SPEC>::Type& action, const typename ENVIRONMENT::State& next_state, RNG& rng): Calculates and returns the scalar reward (T) based on the transition from state to next_state as a result of action. This is where game-specific objectives are encoded.
-rlt::terminated(const DEVICE& device, const ENVIRONMENT& env, typename ENVIRONMENT::Parameters& params, const typename ENVIRONMENT::State& state, RNG& rng): Returns a boolean indicating whether the current state is a terminal state (e.g., enemy died, player died, objective achieved, timeout), thus ending the current episode.
+rl_tools::observe(const DEVICE& device, const ENVIRONMENT& env, typename ENVIRONMENT::Parameters& params, const typename ENVIRONMENT::State& state, const typename ENVIRONMENT::ObservationPrivileged& observation, RNG& rng) (or similar signature for non-privileged observation): From the current environment state, this function extracts or computes the observation vector that will be fed to the RL policy's neural network.
+rl_tools::reward(const DEVICE& device, const ENVIRONMENT& env, typename ENVIRONMENT::Parameters& params, const typename ENVIRONMENT::State& state, const typename rl_tools::rl::utils::typing::Action<typename ENVIRONMENT::ACTION_SPEC>::Type& action, const typename ENVIRONMENT::State& next_state, RNG& rng): Calculates and returns the scalar reward (T) based on the transition from state to next_state as a result of action. This is where game-specific objectives are encoded.
+rl_tools::terminated(const DEVICE& device, const ENVIRONMENT& env, typename ENVIRONMENT::Parameters& params, const typename ENVIRONMENT::State& state, RNG& rng): Returns a boolean indicating whether the current state is a terminal state (e.g., enemy died, player died, objective achieved, timeout), thus ending the current episode.
 
 
 The RLtools custom environment API serves as the linchpin for this integration. Its C++-centric design, emphasizing POD for states and compile-time constants for dimensions 12, is engineered for high performance. This allows the C++ compiler to heavily optimize data exchange and function calls between RLtools and UE5 game logic, which is vital when the complex simulation of UE5 acts as the environment.3.3. Defining the State Space (Observations) for the Enemy AICareful selection of sensory information is crucial for the enemy AI to make intelligent decisions. This information forms the observation vector.
@@ -209,7 +209,7 @@ Moving into hazardous areas.
 
 
 Implementing Reward Logic in C++: The reward calculation occurs in the reward() function of the RLtools C++ environment interface. This function queries the UE5 game state (current and potentially previous) to determine outcomes and assign a float reward. For example, UE5's event system or damage handling functions can be used to track when the enemy deals or takes damage.
-While the technical implementation of the RLtools API is a C++ programming task, the design of the state space, action space, and particularly the reward function, is deeply intertwined with game design and requires an iterative approach. The quality of these components, rather than the specific RL algorithm, will predominantly determine the emergent AI behavior.The following table illustrates a conceptual mapping for a ranged enemy AI:Table 2: Enemy AI RL Environment Definition (Conceptual Example for a Ranged Enemy)RL ComponentExample UE5 Data Source/CalculationRLtools Representation (Example)Observation - Player Rel. Pos.PlayerActor->GetActorLocation() - SelfActor->GetActorLocation()float (normalized X, Y, Z)Observation - Player VelocityPlayerActor->GetVelocity()float (normalized Vx, Vy, Vz)Observation - Line of SightLineTraceTest(Self, Player)float (1.0 for LoS, 0.0 otherwise)Observation - Own HealthSelfHealthComponent->GetCurrentHealth() / MaxHealthfloat (normalized 0 to 1)Observation - Own AmmoSelfWeaponComponent->GetCurrentAmmo() / MaxAmmofloat (normalized 0 to 1)Action - Strafe/Forward VelocityPolicy output action_vec, action_vecfloat (normalized -1 to 1 for X, Y local axes)Action - Aim Adjustment (Delta)Policy output action_vec, action_vecfloat (normalized -1 to 1 for delta Yaw, delta Pitch)Action - Fire TriggerPolicy output action_vecbool (true if action_vec > 0.5)Reward - Damage Dealt to PlayerOnPlayerDamagedBySelfEvent->DamageAmount+ (DamageAmount * Factor)Penalty - Damage Taken by SelfOnSelfTookDamageEvent->DamageAmount- (DamageAmount * Factor)Penalty - Missed ShotIf fire action taken & no hit registeredSmall negative valueReward - Maintaining Optimal RangeIf distance_to_player is within [OptimalMin, OptimalMax]Small positive value per tickThis table provides a concrete example of how abstract RL concepts map to tangible UE5 game variables and events, bridging RL theory with practical game implementation. The subsequent table outlines the C++ function mapping:Table 3: RLtools Custom Environment API Mapping to UE5 C++ (Illustrative Signatures in an URLEnemyEnvComponent)RLtools API Function (Conceptual)Conceptual UE5 C++ Signature in URLEnemyEnvComponentKey Responsibilities in UE5 Contextrlt::initial_statevoid RLEnv_InitialState(typename ENVIRONMENT::State& out_initial_rl_state)Reset enemy AI's position, health, ammo in UE5. Reset player/target if necessary. Populate out_initial_rl_state with data from UE5.rlt::stepvoid RLEnv_Step(const typename ENVIRONMENT::State& current_rl_state, const typename rlt::rl::utils::typing::Action<typename ENVIRONMENT::ACTION_SPEC>::Type& rl_action, typename ENVIRONMENT::State& out_next_rl_state)Translate rl_action into UE5 commands (e.g., move enemy, fire weapon). Tick relevant UE5 simulation aspects. Update out_next_rl_state with the new state from UE5 after the action.rlt::observevoid RLEnv_Observe(const typename ENVIRONMENT::State& current_rl_state, typename ENVIRONMENT::ObservationPrivileged& out_rl_observation)From current_rl_state (which mirrors UE5 state), gather all necessary data from UE5 actors and game world. Normalize/process this data and fill out_rl_observation.rlt::rewardfloat RLEnv_CalculateReward(const typename ENVIRONMENT::State& current_rl_state, const typename rlt::rl::utils::typing::Action<typename ENVIRONMENT::ACTION_SPEC>::Type& rl_action_taken, const typename ENVIRONMENT::State& next_rl_state)Based on the transition from current_rl_state to next_rl_state due to rl_action_taken, query UE5 for outcomes (e.g., damage dealt/taken, objectives met) and calculate the scalar reward.rlt::terminatedbool RLEnv_IsTerminated(const typename ENVIRONMENT::State& current_rl_state)Check conditions in UE5 based on current_rl_state: enemy health <= 0, player health <= 0, episode time limit reached, critical objective failed/succeeded. Return true if episode should end.(Note: Actual RLtools API functions are templated on DEVICE and RNG and may have slightly different parameter orders or types. The signatures above are illustrative for a UE5 component context.)4. Training Your On-Device Enemy AI with RLtoolsOnce the RLtools library is integrated and the UE5-based environment is defined, the next phase is training the enemy AI. This involves selecting an appropriate RL algorithm from RLtools' offerings, setting up the training loop, managing data collection within UE5, and strategizing for on-device learning.4.1. Selecting an RL Algorithm in RLtoolsRLtools provides implementations of several state-of-the-art deep RL algorithms well-suited for continuous control tasks common in game AI 4:
+While the technical implementation of the RLtools API is a C++ programming task, the design of the state space, action space, and particularly the reward function, is deeply intertwined with game design and requires an iterative approach. The quality of these components, rather than the specific RL algorithm, will predominantly determine the emergent AI behavior.The following table illustrates a conceptual mapping for a ranged enemy AI:Table 2: Enemy AI RL Environment Definition (Conceptual Example for a Ranged Enemy)RL ComponentExample UE5 Data Source/CalculationRLtools Representation (Example)Observation - Player Rel. Pos.PlayerActor->GetActorLocation() - SelfActor->GetActorLocation()float (normalized X, Y, Z)Observation - Player VelocityPlayerActor->GetVelocity()float (normalized Vx, Vy, Vz)Observation - Line of SightLineTraceTest(Self, Player)float (1.0 for LoS, 0.0 otherwise)Observation - Own HealthSelfHealthComponent->GetCurrentHealth() / MaxHealthfloat (normalized 0 to 1)Observation - Own AmmoSelfWeaponComponent->GetCurrentAmmo() / MaxAmmofloat (normalized 0 to 1)Action - Strafe/Forward VelocityPolicy output action_vec, action_vecfloat (normalized -1 to 1 for X, Y local axes)Action - Aim Adjustment (Delta)Policy output action_vec, action_vecfloat (normalized -1 to 1 for delta Yaw, delta Pitch)Action - Fire TriggerPolicy output action_vecbool (true if action_vec > 0.5)Reward - Damage Dealt to PlayerOnPlayerDamagedBySelfEvent->DamageAmount+ (DamageAmount * Factor)Penalty - Damage Taken by SelfOnSelfTookDamageEvent->DamageAmount- (DamageAmount * Factor)Penalty - Missed ShotIf fire action taken & no hit registeredSmall negative valueReward - Maintaining Optimal RangeIf distance_to_player is within [OptimalMin, OptimalMax]Small positive value per tickThis table provides a concrete example of how abstract RL concepts map to tangible UE5 game variables and events, bridging RL theory with practical game implementation. The subsequent table outlines the C++ function mapping:Table 3: RLtools Custom Environment API Mapping to UE5 C++ (Illustrative Signatures in an URLEnemyEnvComponent)RLtools API Function (Conceptual)Conceptual UE5 C++ Signature in URLEnemyEnvComponentKey Responsibilities in UE5 Contextrl_tools::initial_statevoid RLEnv_InitialState(typename ENVIRONMENT::State& out_initial_rl_state)Reset enemy AI's position, health, ammo in UE5. Reset player/target if necessary. Populate out_initial_rl_state with data from UE5.rl_tools::stepvoid RLEnv_Step(const typename ENVIRONMENT::State& current_rl_state, const typename rl_tools::rl::utils::typing::Action<typename ENVIRONMENT::ACTION_SPEC>::Type& rl_action, typename ENVIRONMENT::State& out_next_rl_state)Translate rl_action into UE5 commands (e.g., move enemy, fire weapon). Tick relevant UE5 simulation aspects. Update out_next_rl_state with the new state from UE5 after the action.rl_tools::observevoid RLEnv_Observe(const typename ENVIRONMENT::State& current_rl_state, typename ENVIRONMENT::ObservationPrivileged& out_rl_observation)From current_rl_state (which mirrors UE5 state), gather all necessary data from UE5 actors and game world. Normalize/process this data and fill out_rl_observation.rl_tools::rewardfloat RLEnv_CalculateReward(const typename ENVIRONMENT::State& current_rl_state, const typename rl_tools::rl::utils::typing::Action<typename ENVIRONMENT::ACTION_SPEC>::Type& rl_action_taken, const typename ENVIRONMENT::State& next_rl_state)Based on the transition from current_rl_state to next_rl_state due to rl_action_taken, query UE5 for outcomes (e.g., damage dealt/taken, objectives met) and calculate the scalar reward.rl_tools::terminatedbool RLEnv_IsTerminated(const typename ENVIRONMENT::State& current_rl_state)Check conditions in UE5 based on current_rl_state: enemy health <= 0, player health <= 0, episode time limit reached, critical objective failed/succeeded. Return true if episode should end.(Note: Actual RLtools API functions are templated on DEVICE and RNG and may have slightly different parameter orders or types. The signatures above are illustrative for a UE5 component context.)4. Training Your On-Device Enemy AI with RLtoolsOnce the RLtools library is integrated and the UE5-based environment is defined, the next phase is training the enemy AI. This involves selecting an appropriate RL algorithm from RLtools' offerings, setting up the training loop, managing data collection within UE5, and strategizing for on-device learning.4.1. Selecting an RL Algorithm in RLtoolsRLtools provides implementations of several state-of-the-art deep RL algorithms well-suited for continuous control tasks common in game AI 4:
 TD3 (Twin Delayed Deep Deterministic Policy Gradient): An off-policy actor-critic algorithm designed for continuous action spaces. It improves upon DDPG by using clipped double Q-learning to reduce overestimation bias and delaying policy updates for increased stability.4 It is often a strong choice for complex continuous control.
 PPO (Proximal Policy Optimization): An on-policy actor-critic algorithm known for its robust performance, ease of tuning, and good sample efficiency relative to other policy gradient methods. PPO is often a reliable baseline.4
 SAC (Soft Actor-Critic): An off-policy actor-critic algorithm based on the maximum entropy RL framework. It encourages exploration by adding an entropy term to the objective function and has demonstrated excellent sample efficiency and stability in challenging continuous control benchmarks.6
@@ -220,7 +220,7 @@ The final choice may also depend on the specific characteristics of the reward l
 The following table summarizes key characteristics of these algorithms in the context of game AI:Table 4: RLtools Algorithm Selection Guide (Simplified for Game AI Context)AlgorithmRL ParadigmAction Space SuitabilityKey Characteristics & StrengthsPotential Use Case / Considerations for Enemy AI in UE5PPOOn-policyContinuous / DiscreteStable, relatively easy to tune, good general performance. Often a strong baseline.Suitable for a wide range of behaviors. May require more environment interactions than off-policy methods for complex continuous control.TD3Off-policyContinuousStable improvements over DDPG, handles continuous control well, good sample efficiency.Excellent for tasks requiring smooth, continuous motion and aiming, like intelligent shooters or agile melee combatants.SACOff-policyContinuousMaximum entropy framework encourages exploration, highly sample efficient, robust performance.Ideal for complex behaviors where exploration is key, such as discovering sophisticated tactics or navigating intricate environments dynamically.4.2. The Training Loop: Utilizing RLtools' "Loop Interface"RLtools offers a "Loop Interface" that provides a structured yet flexible way to manage the RL training process.19 This interface is designed to abstract common training patterns while giving the user significant control over the training progression. This is particularly beneficial in a game development context, where training might need to be interleaved with game logic or custom scheduling.The core components of the Loop Interface are 19:
 Configuration (LOOP_CORE_CONFIG): Compile-time settings defining neural network architectures (typically fully-connected networks for RLtools ), algorithm-specific hyperparameters, and the environment type (your custom UE5 environment wrapper).
 State (LOOP_CORE_STATE or algorithm-specific e.g., PPO_LOOP_STATE): A data structure encapsulating the entire state of the training procedure, including model weights, optimizer states, replay buffers (for off-policy), and step counters.
-Step Operation (rlt::step(device, loop_state_instance)): A function that advances the training process by one logical step. This "step" can encompass multiple environment interactions, data collection, and one or more policy/value function update iterations.
+Step Operation (rl_tools::step(device, loop_state_instance)): A function that advances the training process by one logical step. This "step" can encompass multiple environment interactions, data collection, and one or more policy/value function update iterations.
 Practical Usage in UE5 C++:The training loop can be managed within a dedicated UE5 actor, component, or a manager class. For example, in an ARLTrainingManager actor:C++// ARLTrainingManager.h (Simplified)
 #pragma once
 #include "CoreMinimal.h"
@@ -254,22 +254,22 @@ protected:
 
 private:
     // RLtools Device
-    rlt::devices::DefaultCPU device; // Or another DEVICE_FACTORY based device
+    rl_tools::devices::DefaultCPU device; // Or another DEVICE_FACTORY based device
 
     // Define your UE5 Environment Type (must match RLtools API)
     // This would be your wrapper around the UE5 enemy AI
     // For this example, let's use the Pendulum environment for structure
-    using ENVIRONMENT_PARAMETERS = rlt::rl::environments::pendulum::DefaultParameters<float>;
-    using ENVIRONMENT_SPEC = rlt::rl::environments::pendulum::Specification<float, int, ENVIRONMENT_PARAMETERS>;
-    using ENVIRONMENT = rlt::rl::environments::Pendulum<ENVIRONMENT_SPEC>; // REPLACE with your UE5 Env
+    using ENVIRONMENT_PARAMETERS = rl_tools::rl::environments::pendulum::DefaultParameters<float>;
+    using ENVIRONMENT_SPEC = rl_tools::rl::environments::pendulum::Specification<float, int, ENVIRONMENT_PARAMETERS>;
+    using ENVIRONMENT = rl_tools::rl::environments::Pendulum<ENVIRONMENT_SPEC>; // REPLACE with your UE5 Env
 
     // SAC Loop Configuration (example)
-    using LOOP_CORE_PARAMETERS = rlt::rl::algorithms::sac::loop::core::DefaultParameters<float, int, ENVIRONMENT>;
+    using LOOP_CORE_PARAMETERS = rl_tools::rl::algorithms::sac::loop::core::DefaultParameters<float, int, ENVIRONMENT>;
     struct LOOP_CONFIG : LOOP_CORE_PARAMETERS {
         // Override any default parameters here if needed
         // static constexpr int STEP_LIMIT = 200000;
     };
-    using LOOP_CORE_CONFIG = rlt::rl::algorithms::sac::loop::core::Config<LOOP_CONFIG>;
+    using LOOP_CORE_CONFIG = rl_tools::rl::algorithms::sac::loop::core::Config<LOOP_CONFIG>;
     
     typename LOOP_CORE_CONFIG::template State<LOOP_CORE_CONFIG> loop_state;
     
@@ -296,21 +296,21 @@ void ARLTrainingManager::BeginPlay()
     // loop_state.environment = ue_env; // This assignment needs careful handling based on how ENVIRONMENT is defined
 
     // Initialize RLtools components
-    rlt::malloc(device, loop_state);
+    rl_tools::malloc(device, loop_state);
     // You'll need to pass your actual UE5 environment instance to init
     // For the placeholder Pendulum:
     ENVIRONMENT env_instance;
     ENVIRONMENT::Parameters env_params;
-    rlt::init(device, env_instance, env_params, loop_state.rng_eval); // Simplified init for pendulum
+    rl_tools::init(device, env_instance, env_params, loop_state.rng_eval); // Simplified init for pendulum
     // The actual init for loop_state will depend on the algorithm and if it embeds the env
     // or takes it as a separate parameter.
-    // rlt::init(device, loop_state, your_ue5_env_wrapper_instance, seed);
+    // rl_tools::init(device, loop_state, your_ue5_env_wrapper_instance, seed);
     
     // For SAC, the loop state itself contains the environment typically.
     // You'd initialize loop_state.environment here if it's part of the state.
     // And then initialize the rest of the loop_state:
     uint32_t seed = 0xF00D; // Example seed
-    rlt::init(device, loop_state, seed); 
+    rl_tools::init(device, loop_state, seed); 
 
     bIsTrainingInitialized = true;
     UERL_WARNING( TEXT("RLtools training initialized."));
@@ -324,7 +324,7 @@ void ARLTrainingManager::Tick(float DeltaTime)
     {
         // Perform one logical step of the RL algorithm
         // This will internally call your UE5 environment's step, observe, reward, terminated functions
-        bool finished_episode_or_update = rlt::step(device, loop_state);
+        bool finished_episode_or_update = rl_tools::step(device, loop_state);
         
         current_step++;
 
@@ -346,11 +346,11 @@ void ARLTrainingManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     if (bIsTrainingInitialized)
     {
-        rlt::free(device, loop_state);
+        rl_tools::free(device, loop_state);
     }
     Super::EndPlay(EndPlayReason);
 }
-The Loop Interface's design, where the user explicitly calls rlt::step(), grants fine-grained control. This allows for straightforward implementation of custom learning rate schedules, curriculum learning, periodic evaluation of the agent's policy, and model checkpointing directly within the UE5 C++ code, without needing a complex callback system.19 For even deeper customization, developers can bypass the Loop Interface and directly call lower-level RLtools operations like collect(...), estimate_generalized_advantages(...) (for PPO), and train(...).194.3. Data Collection within the UE5 EnvironmentThe RLtools training loop, through its step() operation (or direct calls to collect()), will repeatedly invoke the step(), observe(), reward(), and terminated() functions of your custom UE5 C++ environment interface (detailed in Section 3). Efficient data transfer between UE5's game state and RLtools' internal structures (like replay buffers for off-policy algorithms) is vital. Since the entire system operates within C++, this data exchange can be highly optimized using direct memory operations (e.g., memcpy for POD state/observation types) rather than slower serialization or inter-process communication methods often seen in Python-C++ RL setups.4.4. Strategies for On-Device Training and DevelopmentA key goal is to enable on-device training, allowing the AI to learn or adapt directly on the end-user's hardware.
+The Loop Interface's design, where the user explicitly calls rl_tools::step(), grants fine-grained control. This allows for straightforward implementation of custom learning rate schedules, curriculum learning, periodic evaluation of the agent's policy, and model checkpointing directly within the UE5 C++ code, without needing a complex callback system.19 For even deeper customization, developers can bypass the Loop Interface and directly call lower-level RLtools operations like collect(...), estimate_generalized_advantages(...) (for PPO), and train(...).194.3. Data Collection within the UE5 EnvironmentThe RLtools training loop, through its step() operation (or direct calls to collect()), will repeatedly invoke the step(), observe(), reward(), and terminated() functions of your custom UE5 C++ environment interface (detailed in Section 3). Efficient data transfer between UE5's game state and RLtools' internal structures (like replay buffers for off-policy algorithms) is vital. Since the entire system operates within C++, this data exchange can be highly optimized using direct memory operations (e.g., memcpy for POD state/observation types) rather than slower serialization or inter-process communication methods often seen in Python-C++ RL setups.4.4. Strategies for On-Device Training and DevelopmentA key goal is to enable on-device training, allowing the AI to learn or adapt directly on the end-user's hardware.
 True On-Device Training (Leveraging "TinyRL" Principles):
 RLtools' efficiency and low resource footprint, proven by its "TinyRL" successes on microcontrollers 3, make this feasible. The entire RLtools training loop runs on the target game platform (PC, console, high-end mobile).
 
@@ -384,7 +384,7 @@ From HDF5 Checkpoints (checkpoint.h5):If models were saved using the HDF5 format
 Ensure the HDF5 C++ library (e.g., HighFive headers and potentially linked HDF5 libraries if not header-only for HighFive's backend) is correctly integrated into the UE5 build.
 Use HDF5 API calls to open the .h5 file.
 Read the datasets corresponding to the neural network layers (weights and biases) for the actor (and critic, if needed for some advanced inference techniques, though typically only the actor is used for action selection).
-Populate the corresponding RLtools neural network structures (e.g., rlt::nn_models::mlp::NeuralNetwork) with these weights.
+Populate the corresponding RLtools neural network structures (e.g., rl_tools::nn_models::mlp::NeuralNetwork) with these weights.
 This process typically occurs during the initialization phase of the enemy AI character or its controller, for example, in the BeginPlay() method of an AActor or UActorComponent.
 
 
@@ -408,11 +408,11 @@ C++// In your enemy AI's update logic (e.g., TickComponent)
 Format Observations: Ensure the observation vector is in the exact numerical format (e.g., float array, normalized) expected by the RLtools policy network's input layer.
 Perform Forward Pass: Use the RLtools API to perform a forward pass through the loaded actor (policy) network using the current observation.
 
-The specific RLtools function will depend on the neural network model structure (e.g., rlt::evaluate(device, actor_network, observation_buffer, action_buffer, actor_buffers, rng)).
+The specific RLtools function will depend on the neural network model structure (e.g., rl_tools::evaluate(device, actor_network, observation_buffer, action_buffer, actor_buffers, rng)).
 The output will be an action vector.
 
 C++// MyRltoolsActionType output_action;
-// rlt::evaluate(device, loaded_policy_actor, current_observation, output_action, temporary_buffers_for_actor, rng_for_inference);
+// rl_tools::evaluate(device, loaded_policy_actor, current_observation, output_action, temporary_buffers_for_actor, rng_for_inference);
 
 (Note: temporary_buffers_for_actor and rng_for_inference might be needed depending on the policy structure and if stochastic actions are used during inference, though deterministic actions are common.)
 Apply Actions: Translate the raw action vector from the policy network into concrete commands for the UE5 enemy AI (as defined in Section 3.4). This might involve denormalizing values, thresholding for discrete actions, or passing continuous values to movement and rotation functions.
