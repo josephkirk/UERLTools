@@ -123,7 +123,12 @@ class UERLTOOLS_API URLAgentManager : public UObject
 
 public:
 	URLAgentManager();
-	virtual ~URLAgentManager(); // Added destructor as per NeedMerge.md
+	virtual ~URLAgentManager();
+
+	// Called by URLAgentManagerSubsystem to initialize the agent with its environment and config
+	// This is where rl_tools components will be allocated and initialized.
+	bool InitializeAgentLogic(URLEnvironmentComponent* InEnvironmentComponent, const FLocalRLTrainingConfig& InTrainingConfig, rlt::devices::DefaultCPU::CONTEXT_TYPE* InRltContext, FName InAgentName = NAME_None);
+
 
 	// Training configuration
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Training")
@@ -146,8 +151,8 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Policy Events")
 	FOnPolicySaved OnPolicySaved;
 
-	// Initialization
-	UFUNCTION(BlueprintCallable, Category = "Agent")
+	// Initialization (Blueprint-callable wrapper if needed, or direct call to InitializeAgentLogic from subsystem)
+	UFUNCTION(BlueprintCallable, Category = "Agent", meta=(DeprecatedFunction, DeprecationMessage="Use InitializeAgentLogic, typically called by the subsystem."))
 	bool InitializeAgent(URLEnvironmentComponent* InEnvironmentComponent, const FLocalRLTrainingConfig& InTrainingConfig);
 
 	// Training functions
@@ -187,6 +192,13 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Agent")
 	bool IsInitialized() const { return bIsInitialized; }
 
+	// Shuts down the agent and releases all resources
+	UFUNCTION(BlueprintCallable, Category = "Agent")
+	void ShutdownAgent();
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Agent")
+	FName AgentName;
+
 protected:
 	// rl_tools types and constants
 	using DEVICE = rlt::devices::DefaultCPU;
@@ -199,6 +211,8 @@ protected:
 
 		// PLACEHOLDER DIMENSIONS: These MUST be validated against the URLEnvironmentComponent instance at runtime.
 		// Adjust these to your most common environment configuration.
+		// These will be set dynamically in InitializeAgentLogic based on InEnvironmentComponent.
+
 		static constexpr TI OBSERVATION_DIM = 4; // Example placeholder
 		static constexpr TI ACTION_DIM = 2;    // Example placeholder
 
@@ -223,7 +237,40 @@ protected:
 
 	// rl_tools types and constants (continuation)
 	// T and TI are already defined above, no need to repeat here.
-	
+
+	// Core rl_tools components for this agent instance
+	// These will be properly typed and allocated in InitializeAgentLogic
+	// Example types (actual types are complex templates):
+	// typename rlt::rl::algorithms::td3::ActorCritic<ACTOR_CRITIC_SPEC>::template Instance actor_critic;
+	// typename rlt::rl::components::off_policy_runner::Buffer<OFF_POLICY_RUNNER_SPEC>::template Instance replay_buffer;
+	// typename rlt::rl::components::replay_buffer::ReplayBuffer<REPLAY_BUFFER_SPEC>::template Instance replay_buffer_struct; // If using standalone replay buffer
+	// typename rlt::rl::algorithms::td3::Actor<ACTOR_SPEC>::template Instance actor_network;
+	// typename rlt::rl::algorithms::td3::Critic<CRITIC_SPEC>::template Instance critic_network_1;
+	// typename rlt::rl::algorithms::td3::Critic<CRITIC_SPEC>::template Instance critic_network_2;
+	// typename rlt::rl::algorithms::td3::Actor<ACTOR_SPEC>::template Instance target_actor_network;
+	// typename rlt::rl::algorithms::td3::Critic<CRITIC_SPEC>::template Instance target_critic_network_1;
+	// typename rlt::rl::algorithms::td3::Critic<CRITIC_SPEC>::template Instance target_critic_network_2;
+	// typename rlt::nn::optimizers::adam::Optimizer actor_optimizer;
+	// typename rlt::nn::optimizers::adam::Optimizer critic_optimizer;
+
+	// Pointers to allocated rl_tools buffers (managed by this class)
+	void* rlt_actor_critic_buffer = nullptr;
+	void* rlt_replay_buffer_buffer = nullptr; // For the OffPolicyRunner's buffer component
+	void* rlt_off_policy_runner_buffer = nullptr;
+
+	// Environment Adapter specific to this agent's URLEnvironmentComponent instance
+	// rlt::rl::environments::UEEnvironmentAdapter<UERLAgentEnvironmentSpec> RLEnvironmentAdapter;
+	// This would be tricky as UERLAgentEnvironmentSpec needs dynamic OBS_DIM/ACT_DIM.
+	// Instead, we'll store the dimensions and use them to initialize templated types locally in functions.
+	TI ObservationDim = 0;
+	TI ActionDim = 0;
+
+	// rl_tools device and context for this agent's operations
+	// This context might be shared from the subsystem or created per agent.
+	// For now, assume it's passed in or a new one is created if null.
+	DEVICE rlt_device_instance; // The device instance itself
+	rlt::devices::DefaultCPU::CONTEXT_TYPE* rlt_context_ptr = nullptr; // Pointer to the context
+
 	// Network architecture constants
 	static constexpr TI HIDDEN_DIM = 64;
 	static constexpr TI NUM_LAYERS = 2;

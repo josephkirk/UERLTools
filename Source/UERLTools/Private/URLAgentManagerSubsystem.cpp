@@ -1,6 +1,7 @@
 #include "URLAgentManagerSubsystem.h"
-#include "RLEnvironmentComponent.h" // Assuming RLEnvironmentComponent.h exists
-#include "RLTypes.h"                // Assuming FRLTrainingConfig is in RLTypes.h
+#include "RLEnvironmentComponent.h"
+#include "RLAgentManager.h"
+#include "RLTypes.h"
 #include "Logging/LogMacros.h"
 
 // Fallback log category
@@ -31,15 +32,16 @@ void URLAgentManagerSubsystem::Deinitialize()
 
     // Ensure all agents and their rl_tools resources are cleaned up
     TArray<FName> AgentNames;
-    ManagedAgents.GetKeys(AgentNames);
+    ActiveAgents.GetKeys(AgentNames);
     for (FName AgentName : AgentNames)
     {
-        if (ManagedAgents.Contains(AgentName))
+        URLAgentManager* Agent = ActiveAgents.FindRef(AgentName);
+        if (Agent)
         {
-            CleanupAgentResources(ManagedAgents[AgentName]);
+            Agent->ShutdownAgent();
         }
     }
-    ManagedAgents.Empty();
+    ActiveAgents.Empty();
 
     // Deallocate rl_tools global device context
     if (rlt_context)
@@ -52,107 +54,72 @@ void URLAgentManagerSubsystem::Deinitialize()
     Super::Deinitialize();
 }
 
-bool URLAgentManagerSubsystem::ConfigureAgent(FName AgentName, URLEnvironmentComponent* EnvironmentComponent, const FRLTrainingConfig& TrainingConfig)
+bool URLAgentManagerSubsystem::CreateAgent(FName AgentName, URLEnvironmentComponent* EnvironmentComponent, const FRLTrainingConfig& TrainingConfig)
 {
-    UE_LOG(LOG_UERLTOOLS, Warning, TEXT("ConfigureAgent for agent '%s' called but not fully implemented."), *AgentName.ToString());
     if (AgentName == NAME_None)
     {
-        UE_LOG(LOG_UERLTOOLS, Error, TEXT("ConfigureAgent: AgentName cannot be None."));
+        UE_LOG(LOG_UERLTOOLS, Error, TEXT("CreateAgent: AgentName cannot be None."));
         return false;
     }
     if (!IsValid(EnvironmentComponent))
     {
-        UE_LOG(LOG_UERLTOOLS, Error, TEXT("ConfigureAgent for agent '%s': Invalid EnvironmentComponent provided."), *AgentName.ToString());
+        UE_LOG(LOG_UERLTOOLS, Error, TEXT("CreateAgent for agent '%s': Invalid EnvironmentComponent provided."), *AgentName.ToString());
         return false;
     }
-
-    if (ManagedAgents.Contains(AgentName))
+    if (ActiveAgents.Contains(AgentName))
     {
-        UE_LOG(LOG_UERLTOOLS, Warning, TEXT("ConfigureAgent: Agent '%s' already exists. Reconfiguring (not fully supported yet)."), *AgentName.ToString());
-        // Potentially clean up old agent before reconfiguring
-        RemoveAgent(AgentName);
-    }
-
-    FRLAgentContext NewAgentContext;
-    NewAgentContext.AgentName = AgentName;
-    NewAgentContext.EnvironmentComponent = EnvironmentComponent;
-    NewAgentContext.CurrentTrainingConfig = TrainingConfig;
-    // --- Initialize rl_tools components ---
-    UE_LOG(LOG_UERLTOOLS, Log, TEXT("Initializing rl_tools components for agent '%s'..."), *AgentName.ToString());
-
-    // 1. Determine Observation and Action Dimensions from EnvironmentComponent
-    int32 observation_dim = EnvironmentComponent->GetObservationDimension();
-    int32 action_dim = EnvironmentComponent->GetActionDimension();
-    if (observation_dim <= 0 || action_dim <= 0) {
-        UE_LOG(LOG_UERLTOOLS, Error, TEXT("ConfigureAgent: Invalid observation or action dimension for agent '%s'."), *AgentName.ToString());
+        UE_LOG(LOG_UERLTOOLS, Warning, TEXT("CreateAgent: Agent '%s' already exists. Remove it first or use a different name."), *AgentName.ToString());
         return false;
     }
 
-    // 2. Initialize Policy (e.g., Neural Network)
-    // For demonstration, use a placeholder MLP type. Replace with correct type as needed.
-    using POLICY_TYPE = rlt::nn_models::mlp::NeuralNetwork<rlt::nn_models::mlp::Specification<rlt::devices::DefaultCPU, float, observation_dim, action_dim, 2, 64>>;
-    NewAgentContext.rlt_policy_buffer = rlt::malloc(rlt_device, rlt_context, sizeof(POLICY_TYPE));
-    if (!NewAgentContext.rlt_policy_buffer) {
-        UE_LOG(LOG_UERLTOOLS, Error, TEXT("ConfigureAgent: Failed to allocate memory for policy buffer for agent '%s'."), *AgentName.ToString());
+    URLAgentManager* NewAgent = NewObject<URLAgentManager>(this); // 'this' is the subsystem, acting as outer
+    if (!NewAgent)
+    {
+        UE_LOG(LOG_UERLTOOLS, Error, TEXT("CreateAgent: Failed to create URLAgentManager instance for agent '%s'."), *AgentName.ToString());
         return false;
     }
-    rlt::init(rlt_device, rlt_context, static_cast<POLICY_TYPE*>(NewAgentContext.rlt_policy_buffer));
 
-    // 3. Initialize Optimizer
-    using OPTIMIZER_TYPE = rlt::nn::optimizers::Adam<POLICY_TYPE>;
-    NewAgentContext.rlt_optimizer_buffer = rlt::malloc(rlt_device, rlt_context, sizeof(OPTIMIZER_TYPE));
-    if (!NewAgentContext.rlt_optimizer_buffer) {
-        UE_LOG(LOG_UERLTOOLS, Error, TEXT("ConfigureAgent: Failed to allocate memory for optimizer buffer for agent '%s'."), *AgentName.ToString());
-        if (NewAgentContext.rlt_policy_buffer) rlt::free(rlt_device, rlt_context, NewAgentContext.rlt_policy_buffer);
+    // The subsystem's rlt_context is passed to the agent. FLocalRLTrainingConfig is used temporarily.
+    // TODO: Update FLocalRLTrainingConfig to FRLTrainingConfig once tech debt #2 is addressed.
+    if (NewAgent->InitializeAgentLogic(EnvironmentComponent, static_cast<FLocalRLTrainingConfig>(TrainingConfig), rlt_context, AgentName))
+    {
+        ActiveAgents.Add(AgentName, NewAgent);
+        UE_LOG(LOG_UERLTOOLS, Log, TEXT("Agent '%s' created and initialized successfully."), *AgentName.ToString());
+        return true;
+    }
+    else
+    {
+        UE_LOG(LOG_UERLTOOLS, Error, TEXT("CreateAgent: Failed to initialize agent logic for '%s'."), *AgentName.ToString());
+        // NewAgent will be garbage collected if not added to ActiveAgents and no other strong refs
         return false;
     }
-    float learning_rate = NewAgentContext.CurrentTrainingConfig.LearningRate;
-    rlt::init(rlt_device, rlt_context, static_cast<OPTIMIZER_TYPE*>(NewAgentContext.rlt_optimizer_buffer), static_cast<POLICY_TYPE*>(NewAgentContext.rlt_policy_buffer), learning_rate);
+}
 
-    // 4. Initialize Actor-Critic Structure (if applicable, e.g., for PPO)
-    using ACTOR_CRITIC_TYPE = rlt::rl::algorithms::ppo::ActorCritic<POLICY_TYPE, OPTIMIZER_TYPE>;
-    NewAgentContext.rlt_actor_critic_buffer = rlt::malloc(rlt_device, rlt_context, sizeof(ACTOR_CRITIC_TYPE));
-    if (!NewAgentContext.rlt_actor_critic_buffer) {
-        UE_LOG(LOG_UERLTOOLS, Error, TEXT("ConfigureAgent: Failed to allocate memory for actor-critic buffer for agent '%s'."), *AgentName.ToString());
-        if (NewAgentContext.rlt_optimizer_buffer) rlt::free(rlt_device, rlt_context, NewAgentContext.rlt_optimizer_buffer);
-        if (NewAgentContext.rlt_policy_buffer) rlt::free(rlt_device, rlt_context, NewAgentContext.rlt_policy_buffer);
-        return false;
-    }
-    rlt::init(rlt_device, rlt_context, static_cast<ACTOR_CRITIC_TYPE*>(NewAgentContext.rlt_actor_critic_buffer),
-              static_cast<POLICY_TYPE*>(NewAgentContext.rlt_policy_buffer),
-              static_cast<OPTIMIZER_TYPE*>(NewAgentContext.rlt_optimizer_buffer));
-
-    // 5. Initialize Replay Buffer (for Off-Policy Algorithms like SAC, DDPG, DQN)
-    // For demonstration, we always allocate a replay buffer; in production, check TrainingConfig.AlgorithmType.
-    using REPLAY_BUFFER_TYPE = rlt::rl::components::ReplayBuffer<float, observation_dim, action_dim, 10000>; // 10000 = buffer capacity
-    NewAgentContext.rlt_replay_buffer = rlt::malloc(rlt_device, rlt_context, sizeof(REPLAY_BUFFER_TYPE));
-    if (!NewAgentContext.rlt_replay_buffer) {
-        UE_LOG(LOG_UERLTOOLS, Error, TEXT("ConfigureAgent: Failed to allocate memory for replay buffer for agent '%s'."), *AgentName.ToString());
-        if (NewAgentContext.rlt_actor_critic_buffer) rlt::free(rlt_device, rlt_context, NewAgentContext.rlt_actor_critic_buffer);
-        if (NewAgentContext.rlt_optimizer_buffer) rlt::free(rlt_device, rlt_context, NewAgentContext.rlt_optimizer_buffer);
-        if (NewAgentContext.rlt_policy_buffer) rlt::free(rlt_device, rlt_context, NewAgentContext.rlt_policy_buffer);
-        return false;
-    }
-    rlt::init(rlt_device, rlt_context, static_cast<REPLAY_BUFFER_TYPE*>(NewAgentContext.rlt_replay_buffer));
-
-    ManagedAgents.Add(AgentName, NewAgentContext);
-    UE_LOG(LOG_UERLTOOLS, Log, TEXT("Agent '%s' configured."), *AgentName.ToString());
-    return true;
+// OLD ConfigureAgent function (now deprecated)
+bool URLAgentManagerSubsystem::ConfigureAgent(FName AgentName, URLEnvironmentComponent* EnvironmentComponent, const FRLTrainingConfig& TrainingConfig)
+{
+    UE_LOG(LOG_UERLTOOLS, Warning, TEXT("ConfigureAgent is deprecated for agent '%s'. Use CreateAgent instead."), *AgentName.ToString());
+    // REMOVE ALL PREVIOUS RL_TOOLS INITIALIZATION LOGIC FROM HERE
+    // (the rlt::malloc and rlt::init calls for policy, optimizer, actor_critic, replay_buffer)
+    // That logic now belongs in URLAgentManager::InitializeAgentLogic
+    return CreateAgent(AgentName, EnvironmentComponent, TrainingConfig);
+}
 }
 
 bool URLAgentManagerSubsystem::RemoveAgent(FName AgentName)
 {
-    UE_LOG(LOG_UERLTOOLS, Warning, TEXT("RemoveAgent for agent '%s' called."), *AgentName.ToString());
-    if (ManagedAgents.Contains(AgentName))
+    URLAgentManager* AgentToRemove = ActiveAgents.FindRef(AgentName);
+    if (AgentToRemove)
     {
-        FRLAgentContext& AgentContext = ManagedAgents[AgentName];
-        if (AgentContext.bIsTraining)
+        UE_LOG(LOG_UERLTOOLS, Log, TEXT("Removing agent '%s'..."), *AgentName.ToString());
+        if (AgentToRemove->IsTraining()) 
         {
-            StopTraining(AgentName); // Ensure training is stopped
+            AgentToRemove->StopTraining(); 
         }
-        CleanupAgentResources(AgentContext); // Free rl_tools resources
+        AgentToRemove->ShutdownAgent();
 
-        ManagedAgents.Remove(AgentName);
+        ActiveAgents.Remove(AgentName);
+        // AgentToRemove (UObject) will be garbage collected
         UE_LOG(LOG_UERLTOOLS, Log, TEXT("Agent '%s' removed."), *AgentName.ToString());
         return true;
     }
@@ -162,40 +129,40 @@ bool URLAgentManagerSubsystem::RemoveAgent(FName AgentName)
 
 bool URLAgentManagerSubsystem::LoadPolicy(FName AgentName, const FString& FilePath)
 {
-    UE_LOG(LOG_UERLTOOLS, Warning, TEXT("LoadPolicy for agent '%s' from path '%s' called but not implemented."), *AgentName.ToString(), *FilePath);
-    if (!ManagedAgents.Contains(AgentName))
+    URLAgentManager* Agent = ActiveAgents.FindRef(AgentName);
+    if (Agent)
     {
-        UE_LOG(LOG_UERLTOOLS, Error, TEXT("LoadPolicy: Agent '%s' not found."), *AgentName.ToString());
-        return false;
+        bool bSuccess = Agent->LoadPolicy(FilePath);
+        OnAgentPolicyLoaded.Broadcast(AgentName, FilePath); // Consider broadcasting based on bSuccess
+        return bSuccess;
     }
-    // TODO: Implement policy loading from file using rl_tools serialization
-    OnAgentPolicyLoaded.Broadcast(AgentName, FilePath); // Broadcast success/failure based on actual outcome
-    return false; // Placeholder
+    UE_LOG(LOG_UERLTOOLS, Error, TEXT("LoadPolicy: Agent '%s' not found."), *AgentName.ToString());
+    return false;
 }
 
 bool URLAgentManagerSubsystem::SavePolicy(FName AgentName, const FString& FilePath)
 {
-    UE_LOG(LOG_UERLTOOLS, Warning, TEXT("SavePolicy for agent '%s' to path '%s' called but not implemented."), *AgentName.ToString(), *FilePath);
-    if (!ManagedAgents.Contains(AgentName))
+    URLAgentManager* Agent = ActiveAgents.FindRef(AgentName);
+    if (Agent)
     {
-        UE_LOG(LOG_UERLTOOLS, Error, TEXT("SavePolicy: Agent '%s' not found."), *AgentName.ToString());
-        return false;
+        bool bSuccess = Agent->SavePolicy(FilePath);
+        OnAgentPolicySaved.Broadcast(AgentName, FilePath);
+        return bSuccess;
     }
-    // TODO: Implement policy saving to file using rl_tools serialization
-    OnAgentPolicySaved.Broadcast(AgentName, FilePath); // Broadcast success/failure
-    return false; // Placeholder
+    UE_LOG(LOG_UERLTOOLS, Error, TEXT("SavePolicy: Agent '%s' not found."), *AgentName.ToString());
+    return false;
 }
 
 bool URLAgentManagerSubsystem::StartTraining(FName AgentName)
 {
-    UE_LOG(LOG_UERLTOOLS, Warning, TEXT("StartTraining for agent '%s' called but not implemented."), *AgentName.ToString());
-    if (!ManagedAgents.Contains(AgentName))
+    URLAgentManager* Agent = ActiveAgents.FindRef(AgentName);
+    if (!Agent)
     {
         UE_LOG(LOG_UERLTOOLS, Error, TEXT("StartTraining: Agent '%s' not found."), *AgentName.ToString());
         return false;
     }
-    FRLAgentContext& AgentContext = ManagedAgents[AgentName];
-    if (AgentContext.bIsTraining)
+    
+    if (Agent->IsTraining())
     {
         UE_LOG(LOG_UERLTOOLS, Warning, TEXT("StartTraining: Agent '%s' is already training."), *AgentName.ToString());
         return false;
@@ -203,120 +170,92 @@ bool URLAgentManagerSubsystem::StartTraining(FName AgentName)
     AgentContext.bIsTraining = true;
     // TODO: Implement asynchronous training loop (FAsyncTask or FTSTicker)
     // This loop will call environment step, observe, rl_tools update, etc.
-    // It should also call OnAgentTrainingStepCompleted.Broadcast(...)
     return true; // Placeholder
 }
 
 bool URLAgentManagerSubsystem::PauseTraining(FName AgentName)
 {
-    UE_LOG(LOG_UERLTOOLS, Warning, TEXT("PauseTraining for agent '%s' called but not implemented."), *AgentName.ToString());
-    if (!ManagedAgents.Contains(AgentName))
+    URLAgentManager* Agent = ActiveAgents.FindRef(AgentName);
+    if (!Agent)
     {
         UE_LOG(LOG_UERLTOOLS, Error, TEXT("PauseTraining: Agent '%s' not found."), *AgentName.ToString());
         return false;
     }
-    FRLAgentContext& AgentContext = ManagedAgents[AgentName];
-    if (!AgentContext.bIsTraining)
+    
+    if (!Agent->IsTraining())
     {
         UE_LOG(LOG_UERLTOOLS, Warning, TEXT("PauseTraining: Agent '%s' is not currently training."), *AgentName.ToString());
         return false;
     }
-    // TODO: Implement logic to pause the async training task
-    AgentContext.bIsTraining = false; // Simplistic pause, actual async task needs pausing
-    return false; // Placeholder
+    
+    Agent->PauseTraining();
+    UE_LOG(LOG_UERLTOOLS, Log, TEXT("Agent '%s' training paused."), *AgentName.ToString());
+    return true; // Simplistic pause, actual async task needs pausing
 }
 
 bool URLAgentManagerSubsystem::StopTraining(FName AgentName)
 {
-    UE_LOG(LOG_UERLTOOLS, Warning, TEXT("StopTraining for agent '%s' called but not implemented."), *AgentName.ToString());
-    if (!ManagedAgents.Contains(AgentName))
+    URLAgentManager* Agent = ActiveAgents.FindRef(AgentName);
+    if (!Agent)
     {
         UE_LOG(LOG_UERLTOOLS, Error, TEXT("StopTraining: Agent '%s' not found."), *AgentName.ToString());
         return false;
     }
-    FRLAgentContext& AgentContext = ManagedAgents[AgentName];
-    if (!AgentContext.bIsTraining)
+    
+    if (!Agent->IsTraining())
     {
         UE_LOG(LOG_UERLTOOLS, Warning, TEXT("StopTraining: Agent '%s' was not training."), *AgentName.ToString());
         // Still proceed to ensure cleanup if state is inconsistent
     }
-    AgentContext.bIsTraining = false;
-    // TODO: Implement logic to gracefully stop the async training task
-    // Ensure any resources held by the training task are released.
-    OnAgentTrainingFinished.Broadcast(AgentName, true); // Broadcast success/failure
+    Agent->StopTraining();
+    UE_LOG(LOG_UERLTOOLS, Log, TEXT("Agent '%s' training stopped."), *AgentName.ToString());
     return true; // Placeholder
 }
 
 TArray<float> URLAgentManagerSubsystem::GetAction(FName AgentName, const TArray<float>& Observation)
 {
-    UE_LOG(LOG_UERLTOOLS, Warning, TEXT("GetAction for agent '%s' called but not fully implemented. Returning empty action."), *AgentName.ToString());
-    if (!ManagedAgents.Contains(AgentName))
+    URLAgentManager* Agent = ActiveAgents.FindRef(AgentName);
+    if (!Agent)
     {
         UE_LOG(LOG_UERLTOOLS, Error, TEXT("GetAction: Agent '%s' not found."), *AgentName.ToString());
         return TArray<float>();
     }
-    // FRLAgentContext& AgentContext = ManagedAgents[AgentName];
-    // TODO:
-    // 1. Convert TArray<float> Observation to rl_tools::Matrix
-    // 2. Perform inference using AgentContext.policy and the rl_tools observation matrix
-    // 3. Convert rl_tools action matrix back to TArray<float>
-    // 4. Return the action
-    return TArray<float>(); // Placeholder
+    
+    if (!Agent->IsInitialized())
+    {
+        UE_LOG(LOG_UERLTOOLS, Error, TEXT("GetAction: Agent '%s' is not initialized."), *AgentName.ToString());
+        return TArray<float>();
+    }
+    
+    return Agent->GetAction(Observation);
 }
 
 void URLAgentManagerSubsystem::CleanupAgentResources(FRLAgentContext& AgentContext)
 {
     UE_LOG(LOG_UERLTOOLS, Log, TEXT("Cleaning up resources for agent '%s'..."), *AgentContext.AgentName.ToString());
-    // Free rl_tools allocated memory for each component
-    // This requires knowing the actual types and how they were initialized.
-    // For now, we assume they are simple buffers allocated with rlt::malloc.
-    // If rl_tools components have their own rlt::free_buffers functions, those should be called first.
-
-    if (AgentContext.rlt_actor_critic_buffer)
-    {
-        // Example: if actor_critic has its own free_buffers function:
-        // rlt::free_buffers(rlt_device, rlt_context, static_cast<ACTUAL_ACTOR_CRITIC_TYPE*>(AgentContext.rlt_actor_critic_buffer));
-        rlt::free(rlt_device, rlt_context, AgentContext.rlt_actor_critic_buffer);
-        AgentContext.rlt_actor_critic_buffer = nullptr;
-        UE_LOG(LOG_UERLTOOLS, Log, TEXT("Agent '%s': rlt_actor_critic_buffer freed."), *AgentContext.AgentName.ToString());
-    }
-    if (AgentContext.rlt_replay_buffer)
-    {
-        rlt::free(rlt_device, rlt_context, AgentContext.rlt_replay_buffer);
-        AgentContext.rlt_replay_buffer = nullptr;
-        UE_LOG(LOG_UERLTOOLS, Log, TEXT("Agent '%s': rlt_replay_buffer freed."), *AgentContext.AgentName.ToString());
-    }
-    if (AgentContext.rlt_optimizer_buffer)
-    {
-        rlt::free(rlt_device, rlt_context, AgentContext.rlt_optimizer_buffer);
-        AgentContext.rlt_optimizer_buffer = nullptr;
-        UE_LOG(LOG_UERLTOOLS, Log, TEXT("Agent '%s': rlt_optimizer_buffer freed."), *AgentContext.AgentName.ToString());
-    }
-    if (AgentContext.rlt_policy_buffer)
-    {
-        rlt::free(rlt_device, rlt_context, AgentContext.rlt_policy_buffer);
-        AgentContext.rlt_policy_buffer = nullptr;
-        UE_LOG(LOG_UERLTOOLS, Log, TEXT("Agent '%s': rlt_policy_buffer freed."), *AgentContext.AgentName.ToString());
-    }
+    // CleanupAgentResources is no longer needed as URLAgentManager handles its own cleanup
+    // Resources are managed by URLAgentManager's ShutdownAgent method
     UE_LOG(LOG_UERLTOOLS, Log, TEXT("Finished cleaning up resources for agent '%s'."), *AgentContext.AgentName.ToString());
 }
 
 bool URLAgentManagerSubsystem::GetAgentTrainingStatus(FName AgentName, bool& bIsCurrentlyTraining, int32& OutCurrentStep, float& OutLastReward)
 {
-    UE_LOG(LOG_UERLTOOLS, Log, TEXT("GetAgentTrainingStatus for agent '%s' called."), *AgentName.ToString());
     bIsCurrentlyTraining = false;
     OutCurrentStep = 0;
     OutLastReward = 0.0f;
-
-    if (!ManagedAgents.Contains(AgentName))
+    
+    URLAgentManager* Agent = ActiveAgents.FindRef(AgentName);
+    if (!Agent)
     {
-        UE_LOG(LOG_UERLTOOLS, Warning, TEXT("GetAgentTrainingStatus: Agent '%s' not found."), *AgentName.ToString());
+        UE_LOG(LOG_UERLTOOLS, Error, TEXT("GetAgentTrainingStatus: Agent '%s' not found."), *AgentName.ToString());
         return false;
     }
-    const FRLAgentContext& AgentContext = ManagedAgents[AgentName];
-    bIsCurrentlyTraining = AgentContext.bIsTraining;
-    OutCurrentStep = AgentContext.CurrentTrainingStep;
-    OutLastReward = AgentContext.LastReward;
+    
+    const FRLTrainingStatus Status = Agent->GetTrainingStatus();
+    bIsCurrentlyTraining = Status.bIsTraining;
+    OutCurrentStep = Status.CurrentStep;
+    OutLastReward = Status.LastEpisodeReward;
+    
     return true;
 }
 

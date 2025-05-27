@@ -19,6 +19,7 @@ URLAgentManager::URLAgentManager()
 	ActorNetwork = nullptr;
 	CriticNetwork = nullptr;
 	EnvironmentAdapterInstance = nullptr;
+	RltContext = nullptr;
 
 	// Initialize training status
 	TrainingStatus.bIsTraining = false;
@@ -286,94 +287,238 @@ bool URLAgentManager::ValidateEnvironment() const
 	}
 
 }
+bool URLAgentManager::InitializeAgentLogic(URLEnvironmentComponent* InEnvironmentComponent, const FLocalRLTrainingConfig& InTrainingConfig, rlt::devices::DefaultCPU::CONTEXT_TYPE* InRltContext, FName InAgentName)
+{
+    if (!InEnvironmentComponent)
+    {
+        UERL_ERROR(TEXT("URLAgentManager::InitializeAgentLogic() - Environment component is null"));
+        return false;
+    }
+
+    if (!InRltContext)
+    {
+        UERL_ERROR(TEXT("URLAgentManager::InitializeAgentLogic() - RL tools context is null"));
+        return false;
+    }
+
+    // Store references
+    EnvironmentComponent = InEnvironmentComponent;
+    TrainingConfig = InTrainingConfig;
+    RltContext = InRltContext;
+    AgentName = InAgentName;
+
+    // Log initialization
+    UERL_LOG(TEXT("URLAgentManager::InitializeAgentLogic() - Initializing agent '%s' with RL tools context"), *AgentName.ToString());
+
+    // Validate environment dimensions match our expectations
+    if (!ValidateEnvironment())
+    {
+        UERL_ERROR(TEXT("URLAgentManager::InitializeAgentLogic() - Environment validation failed"));
+        return false;
+    }
+
+    // Clean up any existing resources
+    CleanupNetworks();
+
+    try
+    {
+        // Create environment adapter
+        EnvironmentAdapterInstance = new ENVIRONMENT_ADAPTER_TYPE(device, EnvironmentComponent, 
+            TrainingConfig.ObservationNormalizationParams, 
+            TrainingConfig.ActionNormalizationParams);
+
+        if (!EnvironmentAdapterInstance)
+        {
+            UERL_ERROR(TEXT("URLAgentManager::InitializeAgentLogic() - Failed to create environment adapter"));
+            return false;
+        }
+
+        // Initialize networks and other RL components here
+        // This is a placeholder for actual network initialization
+        // ActorNetwork = new ActorNetworkType();
+        // rlt::malloc(device, *ActorNetwork);
+        // rlt::init_weights(device, *ActorNetwork, device.random_float_cpu);
+
+        bIsInitialized = true;
+        UERL_LOG(TEXT("URLAgentManager::InitializeAgentLogic() - Agent '%s' initialized successfully"), *AgentName.ToString());
+        return true;
+    }
+    catch (const std::exception& e)
+    {
+        UERL_ERROR(TEXT("URLAgentManager::InitializeAgentLogic() - Standard exception during initialization: %s"), ANSI_TO_TCHAR(e.what()));
+        CleanupNetworks();
+        bIsInitialized = false;
+        return false;
+    }
+    catch (...)
+    {
+        UERL_ERROR(TEXT("URLAgentManager::InitializeAgentLogic() - Unknown exception during initialization"));
+        CleanupNetworks();
+        bIsInitialized = false;
+        return false;
+    }
+}
+
+void URLAgentManager::ShutdownAgent()
+{
+    if (!bIsInitialized)
+    {
+        return; // Already shut down
+    }
+
+    UERL_LOG(TEXT("URLAgentManager::ShutdownAgent() - Shutting down agent '%s'"), *AgentName.ToString());
+
+    // Stop any ongoing training
+    if (TrainingStatus.bIsTraining)
+    {
+        StopTraining();
+    }
+
+    // Clean up all resources
+    CleanupNetworks();
+
+    // Reset state
+    bIsInitialized = false;
+    bTrainingPaused = false;
+    EpisodeStepCount = 0;
+    EpisodeReward = 0.0f;
+    EnvironmentComponent = nullptr;
+    RltContext = nullptr;
+    AgentName = NAME_None;
+    TrainingStatus = FRLTrainingStatus();
+}
+
+void URLAgentManager::~URLAgentManager()
+{
+    ShutdownAgent();
+    UERL_LOG(TEXT("URLAgentManager destroyed."));
+}
 
 void URLAgentManager::CleanupNetworks()
 {
-    UERL_LOG( TEXT("URLAgentManager::CleanupNetworks() - Cleaning up networks and adapter..."));
+    UERL_LOG(TEXT("URLAgentManager::CleanupNetworks() - Cleaning up networks and adapter..."));
 
+    // Free network resources if they exist
+    if (ActorNetwork)
+    {
+        try
+        {
+            rlt::free(device, *ActorNetwork);
+        }
+        catch (...)
+        {
+            UERL_WARNING(TEXT("URLAgentManager::CleanupNetworks() - Exception while freeing actor network"));
+        }
+        delete ActorNetwork;
+        ActorNetwork = nullptr;
+    }
+
+    if (CriticNetwork)
+    {
+        try
+        {
+            rlt::free(device, *CriticNetwork);
+        }
+        catch (...)
+        {
+            UERL_WARNING(TEXT("URLAgentManager::CleanupNetworks() - Exception while freeing critic network"));
+        }
+        delete CriticNetwork;
+        CriticNetwork = nullptr;
+    }
+
+    // Free environment adapter
     if (EnvironmentAdapterInstance)
     {
         delete EnvironmentAdapterInstance;
         EnvironmentAdapterInstance = nullptr;
-        UERL_LOG( TEXT("URLAgentManager::CleanupNetworks() - UEEnvironmentAdapter cleaned up."));
     }
 
-    // ... (cleanup for ActorNetwork, CriticNetwork, etc.) ...
-    // Example:
-    // if (ActorNetwork) {
-    //     rlt::free(device, *ActorNetwork);
-    //     delete ActorNetwork;
-    //     ActorNetwork = nullptr;
-    // }
-    // if (CriticNetwork) {
-    //     rlt::free(device, *CriticNetwork);
-    //     delete CriticNetwork;
-    //     CriticNetwork = nullptr;
-    // }
-    UERL_LOG( TEXT("URLAgentManager::CleanupNetworks() - Placeholder for Actor/Critic network cleanup."));
+    bIsInitialized = false;
 }
 
-URLAgentManager::~URLAgentManager()
-{
-    CleanupNetworks();
-    UERL_LOG( TEXT("URLAgentManager destroyed."));
-}
-
+// Implementation of PerformTrainingStep
 bool URLAgentManager::PerformTrainingStep()
 {
-    // Get action from current policy
-    CurrentAction = GetAction(CurrentObservation);
+    if (!bIsInitialized || !EnvironmentComponent)
+    {
+        UERL_ERROR(TEXT("URLAgentManager::PerformTrainingStep() - Agent not properly initialized"));
+        return false;
+    }
 
-    // Step environment
-    EnvironmentComponent->Step(CurrentAction);
+    try
+    {
+        // Get action from current policy
+        TArray<float> Action = GetAction(CurrentObservation);
 
-    // ... (existing code)
-	// Get next observation and reward
-	TArray<float> NextObservation = EnvironmentComponent->GetObservation();
-	float Reward = EnvironmentComponent->CalculateReward();
+        // Step environment
+        EnvironmentComponent->Step(Action);
 
-	// Update episode tracking
-	EpisodeReward += Reward;
-	EpisodeStepCount++;
-	TrainingStatus.CurrentStep++;
+        // Get next observation and reward
+        TArray<float> NextObservation = EnvironmentComponent->GetObservation();
+        float Reward = EnvironmentComponent->CalculateReward();
 
-	// Check if episode is finished
-	if (EnvironmentComponent->IsEpisodeFinished())
-	{
-		// Episode finished
-		TrainingStatus.LastEpisodeReward = EpisodeReward;
-		EpisodeRewards.Add(EpisodeReward);
-		TrainingStatus.CurrentEpisode++;
+        // Store experience in replay buffer
+        // TODO: Implement experience storage when replay buffer is set up
 
-		// Reset for next episode
-		EpisodeReward = 0.0f;
-		EpisodeStepCount = 0;
-		CurrentObservation = EnvironmentComponent->Reset();
-	}
-	else
-	{
-		// Continue episode
-		CurrentObservation = NextObservation;
-	}
+        // Update training status
+        TrainingStatus.CurrentStep++;
+        EpisodeStepCount++;
+        EpisodeReward += Reward;
 
-	// Update training status
-	UpdateTrainingStatus();
-	LogTrainingProgress();
+        // Check if episode is done
+        bool bIsDone = EnvironmentComponent->IsDone();
+        if (bIsDone || EpisodeStepCount >= TrainingConfig.MaxEpisodeSteps)
+        {
+            // Log episode completion
+            TrainingStatus.LastEpisodeReward = EpisodeReward;
+            TrainingStatus.CurrentEpisode++;
+            
+            // Reset episode-specific counters
+            EpisodeStepCount = 0;
+            EpisodeReward = 0.0f;
 
-	// Broadcast training step event
-	OnTrainingStep.Broadcast(TrainingStatus.CurrentStep, TrainingStatus.AverageReward);
+            // Reset environment for next episode
+            CurrentObservation = EnvironmentComponent->Reset();
+        }
+        else
+        {
+            // Update current observation for next step
+            CurrentObservation = NextObservation;
+        }
 
-	return true;
+        // Update training status
+        UpdateTrainingStatus();
+        LogTrainingProgress();
+
+        return true;
+    }
+    catch (const std::exception& e)
+    {
+        UERL_ERROR(TEXT("URLAgentManager::PerformTrainingStep() - Exception: %s"), ANSI_TO_TCHAR(e.what()));
+        return false;
+    }
+    catch (...)
+    {
+        UERL_ERROR(TEXT("URLAgentManager::PerformTrainingStep() - Unknown exception"));
+        return false;
+    }
 }
 
 void URLAgentManager::CollectExperience()
 {
-	// Placeholder for experience collection
-	// This would store transitions in replay buffer
+    // This method is a placeholder for collecting experience in the replay buffer
+    // Implementation will be added when the replay buffer is properly set up
+    
+    // For now, we'll just log that this method was called
+    UERL_VERBOSE(TEXT("URLAgentManager::CollectExperience() - Collecting experience"));
 }
 
 void URLAgentManager::UpdateNetworks()
 {
-	// Placeholder for network updates
-	// This would perform the actual RL algorithm updates
+    // This method is a placeholder for updating the neural networks
+    // Implementation will be added when the training loop is properly set up
+    
+    // For now, we'll just log that this method was called
+    UERL_VERBOSE(TEXT("URLAgentManager::UpdateNetworks() - Updating networks"));
 }
