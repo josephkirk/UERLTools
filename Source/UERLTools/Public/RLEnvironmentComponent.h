@@ -39,7 +39,7 @@ struct UERLTOOLS_API FLocalRLEnvironmentConfig
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Environment Config")
 	bool bContinuousActions = true;
 
-	FRLEnvironmentConfig() = default; // Use default constructor
+	FLocalRLEnvironmentConfig() = default; // Use default constructor
 };
 
 

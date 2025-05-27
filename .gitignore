@@ -54,10 +54,6 @@ Templates
 Templates/
 .uedependencies
 .tgitconfig
-ThirdParty/
-**/ThirdParty
-**/ThirdParty/
-**/ThirdParty/**
 # Engine
 Engine
 Engine/*

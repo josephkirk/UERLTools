@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 // RL Tools includes for Matrix type
-#include "rl_tools/containers/operations_cpu.h" // For rl_tools::Matrix and its operations
+#include "rl_tools/containers/matrix/matrix.h" // For rl_tools::Matrix and its operations
 
 #include "RLConfigTypes.h" // For FRLNormalizationParams
 

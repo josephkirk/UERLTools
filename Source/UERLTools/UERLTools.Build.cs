@@ -9,12 +9,6 @@ public class UERLTools : ModuleRules
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		
-		// Set C++17 standard as required by rl_tools
-		CppStandard = CppStandardVersion.Cpp17;
-		
-		// Disable some warnings for third-party code
-		bEnableUndefinedIdentifierWarnings = false;
-		
 		PublicIncludePaths.AddRange(
 			new string[] {
 				// Add rl_tools include path

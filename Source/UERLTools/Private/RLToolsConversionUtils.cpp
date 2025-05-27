@@ -2,6 +2,7 @@
 #include "RLConfigTypes.h" // Include for FRLNormalizationParams
 #include "Logging/LogMacros.h"
 #include "Math/UnrealMathUtility.h" // For FMath::Abs and KINDA_SMALL_NUMBER
+#include "rl_tools/containers/matrix/operations_generic.h"
 
 // Fallback log category
 #ifndef LOG_UERLTOOLS
